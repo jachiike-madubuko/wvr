@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://weaver.app/schemas/variation-set.v1.schema.json",
+  "title": "WeaverVariationSetV1",
+  "description": "One base recipe + N interest-personalized variations sharing locked fields. Diff view operates on this object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "baseRecipeId",
+    "interestPackIds",
+    "variations",
+    "diffIndex",
+    "metrics"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^vset_[a-z0-9]{8,32}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "Teacher-facing set title, usually the lesson title from the creator."
+    },
+    "baseRecipeId": {
+      "type": "string",
+      "pattern": "^rcp_[a-z0-9]{8,32}$"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "teacherId": {
+      "type": "string"
+    },
+    "interestPackIds": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "pattern": "^pack_[a-z0-9_]+$"
+      }
+    },
+    "reviewMode": {
+      "type": "string",
+      "enum": [
+        "structural",
+        "word",
+        "full"
+      ],
+      "description": "A/B/C arm for 1.3x review-cost study."
+    },
+    "variations": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "variationId",
+          "recipe"
+        ],
+        "properties": {
+          "variationId": {
+            "type": "string",
+            "pattern": "^var_[a-z0-9]{8,32}$"
+          },
+          "recipe": {
+            "$ref": "recipe.v1.schema.json"
+          }
+        }
+      }
+    },
+    "diffIndex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseVariationId",
+        "entries"
+      ],
+      "description": "Precomputed diff for structural mode. Paths are JSON Pointers into recipe.surface / recipe.contextLayer.",
+      "properties": {
+        "baseVariationId": {
+          "type": "string"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "changeType",
+              "byVariation"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "changeType": {
+                "type": "string",
+                "enum": [
+                  "context_only",
+                  "surface_wording",
+                  "numeric_slot",
+                  "forbidden_locked"
+                ]
+              },
+              "byVariation": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "before": {},
+                    "after": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inferenceCostUsd"
+      ],
+      "properties": {
+        "inferenceCostUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tokenInput": {
+          "type": "integer"
+        },
+        "tokenOutput": {
+          "type": "integer"
+        },
+        "latencyMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "model": {
+          "type": "string"
+        },
+        "exportedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "review": {
+          "type": "object",
+          "description": "Client-instrumented review timing (taught proxy = export; review = time on diff UI).",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "structural",
+                "word",
+                "full"
+              ]
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "completedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "msPerVariation": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "totalReviewMs": {
+              "type": "number"
+            },
+            "baselineSingleLessonReviewMs": {
+              "type": "number",
+              "description": "Teacher-reported or measured time to review base once."
+            },
+            "reviewCostRatio": {
+              "type": "number",
+              "description": "totalReviewMs / baselineSingleLessonReviewMs. Target <= 1.3"
+            }
+          }
+        }
+      }
+    }
+  }
+}

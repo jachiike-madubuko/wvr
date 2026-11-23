@@ -1,0 +1,24 @@
+{
+  "name": "weaver-v0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "start": "npm --prefix web run start",
+    "lint": "npm --prefix web run lint",
+    "test": "npm --prefix web run test",
+    "test:watch": "npm --prefix web run test:watch",
+    "test:e2e": "npm --prefix web run test:e2e",
+    "test:db": "node scripts/test-migrations.mjs",
+    "linear:report": "node scripts/linear-report.mjs",
+    "lessons": "node scripts/lessons.mjs",
+    "live-run": "node scripts/live-run.mjs",
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "icm:studio": "node icm/studio/server.mjs",
+    "sweep:recordings": "node scripts/sweep-recordings.mjs",
+    "verify": "npm run check:migrations && npm run test && npm run test:db && npm run lint && npm run build"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4"
+  }
+}

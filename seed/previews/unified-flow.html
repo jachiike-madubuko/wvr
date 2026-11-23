@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weavr Unified Prototype</title>
+<style>
+  :root {
+    --bg: #070913;
+    --surface: #111728;
+    --border: #1e263d;
+    --text: #f6f1ea;
+    --muted: #8491a8;
+
+    --mint: #48e29a;
+    --coral: #f87171;
+    --blue: #58b6fa;
+    --purple: #c084fc;
+    --yellow: #f5d442;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* Top Navigation */
+  .navbar {
+    height: 54px;
+    background: rgba(14, 20, 36, 0.7);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .nav-brand { font-weight: 700; font-size: 15px; display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .badge-room { font-size: 10px; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 6px; }
+
+  .flip-switch {
+    display: flex;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 3px;
+    border-radius: 999px;
+    gap: 3px;
+  }
+  .flip-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 5px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .flip-btn.active {
+    background: #fff;
+    color: #000;
+  }
+
+  /* 3D Flip Scene (Galaxy <-> Calendar) */
+  .stage-scene {
+    flex: 1;
+    perspective: 2400px;
+    position: relative;
+    display: flex;
+  }
+  .flip-card {
+    width: 100%;
+    min-height: calc(100vh - 54px);
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .flip-card.flipped {
+    transform: rotateY(180deg);
+  }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    overflow-y: auto;
+    padding: 24px;
+  }
+  .flip-card.flipped .face:first-child {
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .flip-card:not(.flipped) .face-back {
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .face-back {
+    transform: rotateY(180deg);
+  }
+
+  /* --- SCREEN 1: GALAXY --- */
+  .stars {
+    position: absolute;
+    inset: 0;
+    background-image: 
+      radial-gradient(1px 1px at 30px 40px, #fff, transparent),
+      radial-gradient(1.5px 1.5px at 150px 100px, #e2e8f0, transparent),
+      radial-gradient(1px 1px at 300px 250px, #94a3b8, transparent),
+      radial-gradient(2px 2px at 500px 180px, #fff, transparent),
+      radial-gradient(1px 1px at 700px 320px, #cbd5e1, transparent),
+      radial-gradient(1.5px 1.5px at 900px 110px, #fff, transparent);
+    background-size: 600px 500px;
+    opacity: 0.65;
+    pointer-events: none;
+  }
+  .nebula {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 45%, rgba(30, 45, 90, 0.45) 0%, rgba(7, 9, 19, 0.95) 75%);
+    pointer-events: none;
+  }
+  .galaxy-field {
+    min-height: 100%;
+    position: relative;
+  }
+  .cluster {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .cluster-pill {
+    background: rgba(14, 20, 36, 0.85);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(10px);
+    z-index: 5;
+  }
+  .cluster-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .cluster-name { font-size: 14px; font-weight: 700; font-family: Georgia, serif; }
+
+  /* Student Node */
+  .node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    z-index: 10;
+  }
+  .node:hover { transform: scale(1.15); z-index: 20; }
+  .ring {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .face-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #d4a373;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border: 2px solid rgba(0,0,0,0.25);
+  }
+  .eyes { display: flex; gap: 6px; margin-bottom: 2px; }
+  .eye { width: 3px; height: 3px; background: #2b1d0c; border-radius: 50%; }
+  .mouth { width: 6px; height: 2px; background: #2b1d0c; border-radius: 1px; }
+  .node-name { font-size: 11px; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+  .node-pace { font-size: 8px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* 500ms Popover */
+  .popover {
+    position: absolute;
+    background: #111625;
+    border: 1px solid #2a344d;
+    border-radius: 16px;
+    padding: 16px;
+    width: 220px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.7);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 60;
+  }
+  .popover.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .pop-btn {
+    width: 100%;
+    padding: 8px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+
+  /* --- SCREEN 2: CALENDAR --- */
+  .cal-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .cal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+  .day-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 270px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .day-card:hover { transform: translateY(-2px); border-color: #3b476b; }
+  .day-card.today { border: 1.5px solid var(--blue); }
+  .wavy-box {
+    width: 100%;
+    height: 100px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0d111a;
+  }
+  .wavy-box svg { width: 100%; height: 100%; display: block; }
+
+  /* Swimlane Table */
+  .swimlane-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .swimlane-table th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; padding: 10px; border-bottom: 1px solid var(--border); }
+  .swimlane-table td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .student-link { color: #fff; font-weight: 600; cursor: pointer; text-decoration: underline; }
+
+  /* --- SCREEN 3: STUDENT PROFILE VIEW --- */
+  .profile-view {
+    position: fixed;
+    inset: 54px 0 0 0;
+    background: var(--bg);
+    z-index: 40;
+    padding: 24px;
+    overflow-y: auto;
+    display: none;
+  }
+  .profile-view.active { display: block; }
+  .profile-shell {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .profile-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+  }
+  .sel-row {
+    display: grid;
+    grid-template-columns: 1fr 1px 1.2fr;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .btn-blocks-cta {
+    background: var(--blue);
+    color: #031b2e;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .btn-blocks-cta:hover { transform: scale(1.03); }
+
+  /* --- SCREEN 4: STUDENT BLOCKS VIEW --- */
+  .blocks-view {
+    position: fixed;
+    inset: 54px 0 0 0;
+    background: #080a10;
+    z-index: 45;
+    padding: 24px;
+    overflow-y: auto;
+    display: none;
+  }
+  .blocks-view.active { display: block; }
+  .deck-wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .mosaic-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .tile {
+    position: relative;
+    border-radius: 18px;
+    padding: 16px;
+    min-height: 130px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.15s ease;
+  }
+  .tile:hover:not(.locked) { transform: translateY(-2px); }
+  .tile.span-2 { grid-column: 1 / -1; }
+  .tile-start { background: var(--yellow); color: #2b2302; }
+  .tile-try { background: var(--blue); color: #04243b; }
+  .tile-check { background: var(--mint); color: #032b17; }
+  .tile-next { background: var(--purple); color: #2a0b45; }
+  .tile.locked { background: #161a25; color: #434e68; cursor: not-allowed; align-items: center; justify-content: center; border: 1px dashed #242c3d; }
+
+  /* Sliding Drawer for Intervention & SEL Chat */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 100;
+  }
+  .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+  .drawer-card {
+    background: #111728;
+    width: 100%;
+    max-width: 460px;
+    height: 100%;
+    padding: 32px 28px;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    transform: translateX(100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .drawer-overlay.open .drawer-card { transform: translateX(0); }
+  .misconception-box {
+    background: #182035;
+    border: 1px solid #283454;
+    border-radius: 16px;
+    padding: 16px;
+  }
+  .step-box {
+    background: #1c263f;
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  /* Modal inside Blocks */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: auto; }
+  .modal-card {
+    background: #151824;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 440px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Global Navbar -->
+<nav class="navbar">
+  <div class="nav-brand" onclick="goHome()">
+    <span>Weavr</span>
+    <span class="badge-room">Room 204</span>
+  </div>
+  <div class="flip-switch" id="flip-controls">
+    <button class="flip-btn active" id="btn-galaxy" onclick="flipFace('galaxy')">Galaxy G</button>
+    <button class="flip-btn" id="btn-calendar" onclick="flipFace('calendar')">Calendar C</button>
+  </div>
+  <div style="font-size: 12px; color: var(--muted);" id="nav-status">Teacher View</div>
+</nav>
+
+<!-- 3D Flip Scene (Galaxy <-> Calendar) -->
+<div class="stage-scene" id="stage-scene">
+  <div class="flip-card" id="flip-card">
+
+    <!-- FRONT FACE: GALAXY -->
+    <div class="face">
+      <div class="stars"></div>
+      <div class="nebula"></div>
+      <div class="galaxy-field">
+
+        <!-- Cluster: Cooking -->
+        <div class="cluster" style="top: 140px; left: 160px;">
+          <div class="cluster-pill">
+            <div class="cluster-dot" style="background: var(--coral);"></div>
+            <span class="cluster-name">Cooking</span>
+          </div>
+          <!-- Students -->
+          <div class="node" style="top: -55px; left: -45px;" onclick="openProfile('Taylor')" onmouseenter="hoverNode('Taylor', event)" onmouseleave="unhoverNode()">
+            <div class="ring" style="border: 2px solid var(--coral);"><div class="face-icon"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div>
+            <span class="node-name">Taylor</span>
+          </div>
+          <div class="node" style="top: -45px; left: 70px;" onclick="openProfile('Skyler')" onmouseenter="hoverNode('Skyler', event)" onmouseleave="unhoverNode()">
+            <div class="ring" style="border: 2px solid var(--coral);"><div class="face-icon"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div>
+            <span class="node-name">Skyler</span>
+          </div>
+          <div class="node" style="top: 45px; left: -50px;" onclick="openProfile('Sam')" onmouseenter="hoverNode('Sam', event)" onmouseleave="unhoverNode()">
+            <div class="ring" style="border: 2px solid var(--coral);"><div class="face-icon"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div>
+            <span class="node-name">Sam</span>
+          </div>
+          <div class="node" style="top: 55px; left: 60px;" onclick="openProfile('Nico')" onmouseenter="hoverNode('Nico', event)" onmouseleave="unhoverNode()">
+            <div class="ring" style="border: 2px solid var(--coral);"><div class="face-icon"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div>
+            <span class="node-name">Nico</span>
+          </div>
+        </div>
+
+        <!-- Cluster: Video Games -->
+        <div class="cluster" style="top: 130px; left: 520px; border: 2px dashed rgba(74,222,128,0.5); border-radius: 28px; padding: 30px 40px; background: rgba(74,222,128,0.03);">
+          <div class="cluster-pill">
+            <div class="cluster-dot" style="background: var(--blue);"></div>
+            <span class="cluster-name">Video Games</span>
+          </div>
+          <div class="node" style="top: -55px; left: 75px;" onclick="openProfile('Jordan')" onmouseenter="hoverNode('Jordan', event)" onmouseleave="unhoverNode()">
+            <div class="ring" style="border: 2px solid var(--blue);"><div class="face-icon"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div>
+            <span class="node-name">Jordan</span>
+            <span class="node-pace" style="color: var(--mint);">FAST</span>
+          </div>
+          <div class="node" style="top: 65px; left: 75px;" onclick="openProfile('Avery')" onmouseenter="hoverNode('Avery', event)" onmouseleave="unhoverNode()">
+            <div class="ring" style="border: 2px solid var(--blue);"><div class="face-icon"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div>
+            <span class="node-name">Avery</span>
+          </div>
+        </div>
+
+        <!-- Cluster: Space -->
+        <div class="cluster" style="top: 130px; right: 180px;">
+          <div class="cluster-pill">
+            <div class="cluster-dot" style="background: #38bdf8;"></div>
+            <span class="cluster-name">Space</span>
+          </div>
+          <div class="node" style="top: -55px; left: 40px;" onclick="openProfile('Drew')" onmouseenter="hoverNode('Drew', event)" onmouseleave="unhoverNode()">
+            <div class="ring" style="border: 2px solid #38bdf8;"><div class="face-icon"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div>
+            <span class="node-name">Drew</span>
+            <span class="node-pace" style="color: var(--coral);">SLOW</span>
+          </div>
+          <div class="node" style="top: 45px; left: 80px;" onclick="openProfile('Morgan')" onmouseenter="hoverNode('Morgan', event)" onmouseleave="unhoverNode()">
+            <div class="ring" style="border: 2px solid #38bdf8;"><div class="face-icon"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div>
+            <span class="node-name">Morgan</span>
+            <span class="node-pace" style="color: var(--mint);">FAST</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- BACK FACE: PACING CALENDAR -->
+    <div class="face face-back">
+      <div class="cal-container">
+        <div class="cal-header">
+          <div>
+            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--blue);">Pacing Calendar</span>
+            <h2 style="font-size: 24px; font-weight: 700; margin-top: 4px;">Week 3 — Wavy Stack Distribution</h2>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="flip-btn active" id="tab-cal" onclick="showCalTab('grid')">Wavy Grid</button>
+            <button class="flip-btn" id="tab-swim" onclick="showCalTab('table')">Swimlane Table</button>
+          </div>
+        </div>
+
+        <!-- 5-Day Wavy Grid -->
+        <div class="cal-grid" id="cal-grid-view">
+          <!-- Mon -->
+          <div class="day-card">
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--muted); font-size: 12px; font-weight: 700;">MON</span><strong>17</strong></div>
+            <div class="wavy-box"><svg viewBox="0 0 100 60" preserveAspectRatio="none"><path d="M 0 0 L 100 0 L 100 25 Q 75 30 50 20 T 0 25 Z" fill="#48e29a"/><path d="M 0 25 Q 25 15 50 20 T 100 25 L 100 48 Q 75 52 50 45 T 0 50 Z" fill="#58b6fa"/><path d="M 0 50 Q 25 40 50 45 T 100 48 L 100 60 L 0 60 Z" fill="#f87171"/></svg></div>
+            <div style="font-size: 11px; color: var(--muted);">40% ahead · 15% behind</div>
+          </div>
+          <!-- Tue -->
+          <div class="day-card">
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--muted); font-size: 12px; font-weight: 700;">TUE</span><strong>18</strong></div>
+            <div class="wavy-box"><svg viewBox="0 0 100 60" preserveAspectRatio="none"><path d="M 0 0 L 100 0 L 100 30 Q 75 25 50 32 T 0 28 Z" fill="#48e29a"/><path d="M 0 28 Q 25 35 50 32 T 100 30 L 100 52 Q 75 48 50 54 T 0 50 Z" fill="#58b6fa"/><path d="M 0 50 Q 25 55 50 54 T 100 52 L 100 60 L 0 60 Z" fill="#f87171"/></svg></div>
+            <div style="font-size: 11px; color: var(--muted);">50% ahead · 12% behind</div>
+          </div>
+          <!-- Wed (Today) -->
+          <div class="day-card today">
+            <div style="display: flex; justify-content: space-between;"><div><span style="color: var(--muted); font-size: 12px; font-weight: 700;">WED</span><span style="color: var(--blue); font-size: 10px;"> · TODAY</span></div><strong>19</strong></div>
+            <div class="wavy-box"><svg viewBox="0 0 100 60" preserveAspectRatio="none"><path d="M 0 0 L 100 0 L 100 20 Q 75 26 50 18 T 0 22 Z" fill="#48e29a"/><path d="M 0 22 Q 25 15 50 18 T 100 20 L 100 45 Q 75 52 50 42 T 0 44 Z" fill="#58b6fa"/><path d="M 0 44 Q 25 38 50 42 T 100 45 L 100 60 L 0 60 Z" fill="#f87171"/></svg></div>
+            <div style="font-size: 11px; color: var(--muted);">35% ahead · 23% behind</div>
+          </div>
+          <!-- Thu -->
+          <div class="day-card">
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--muted); font-size: 12px; font-weight: 700;">THU</span><strong>20</strong></div>
+            <div class="wavy-box"><svg viewBox="0 0 100 60" preserveAspectRatio="none"><path d="M 0 0 L 100 0 L 100 35 Q 75 42 50 30 T 0 32 Z" fill="#48e29a"/><path d="M 0 32 Q 25 24 50 30 T 100 35 L 100 52 Q 75 56 50 50 T 0 50 Z" fill="#58b6fa"/><path d="M 0 50 Q 25 46 50 50 T 100 52 L 100 60 L 0 60 Z" fill="#f87171"/></svg></div>
+            <div style="font-size: 11px; color: var(--muted);">55% ahead · 15% behind</div>
+          </div>
+          <!-- Fri -->
+          <div class="day-card">
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--muted); font-size: 12px; font-weight: 700;">FRI</span><strong>21</strong></div>
+            <div class="wavy-box"><svg viewBox="0 0 100 60" preserveAspectRatio="none"><path d="M 0 0 L 100 0 L 100 42 Q 75 38 50 44 T 0 38 Z" fill="#48e29a"/><path d="M 0 38 Q 25 46 50 44 T 100 42 L 100 54 Q 75 52 50 56 T 0 52 Z" fill="#58b6fa"/><path d="M 0 52 Q 25 58 50 56 T 100 54 L 100 60 L 0 60 Z" fill="#f87171"/></svg></div>
+            <div style="font-size: 11px; color: var(--muted);">65% ahead · 10% behind</div>
+          </div>
+        </div>
+
+        <!-- Swimlane Table View -->
+        <div id="cal-table-view" style="display: none;" class="panel">
+          <table class="swimlane-table">
+            <thead><tr><th>Student</th><th>Math</th><th>ELA</th><th>Status</th><th>Profile</th></tr></thead>
+            <tbody>
+              <tr><td><span class="student-link" onclick="openProfile('Drew')">Drew</span></td><td style="color: var(--coral);">Slow (-18m)</td><td>On Pace</td><td style="color: var(--coral); font-weight: 700;">Behind</td><td><button class="flip-btn" style="background:#242c3d; color:#fff;" onclick="openProfile('Drew')">View Profile</button></td></tr>
+              <tr><td><span class="student-link" onclick="openProfile('Jordan')">Jordan</span></td><td style="color: var(--mint);">Fast (+12m)</td><td>Fast</td><td style="color: var(--mint); font-weight: 700;">Ahead</td><td><button class="flip-btn" style="background:#242c3d; color:#fff;" onclick="openProfile('Jordan')">View Profile</button></td></tr>
+              <tr><td><span class="student-link" onclick="openProfile('Sam')">Sam</span></td><td>On Pace</td><td>On Pace</td><td>On Pace</td><td><button class="flip-btn" style="background:#242c3d; color:#fff;" onclick="openProfile('Sam')">View Profile</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 3: STUDENT PROFILE OVERLAY -->
+<div class="profile-view" id="profile-view">
+  <div class="profile-shell">
+    <div class="profile-top">
+      <div>
+        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted);">Student Profile</span>
+        <h1 id="profile-student-name" style="font-size: 28px; margin-top: 4px;">Drew</h1>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-blocks-cta" onclick="openBlocksDemo()">View Current Blocks ↗</button>
+        <button class="flip-btn" style="background: #242c3d; color:#fff; padding: 8px 16px;" onclick="closeProfile()">Close</button>
+      </div>
+    </div>
+
+    <!-- Top SEL Row: Weaver Wheel + Checkins -->
+    <div class="panel">
+      <div class="sel-row">
+        <!-- Weaver Wheel -->
+        <div style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+          <strong style="font-size: 14px; margin-bottom: 8px;">Weaver Wheel (Intake Form)</strong>
+          <svg viewBox="0 0 200 200" style="width: 200px; height: 200px;">
+            <polygon points="100,20 176,75 147,165 53,165 24,75" fill="none" stroke="#232d47" stroke-width="1"/>
+            <polygon points="100,50 145,85 128,139 72,139 55,85" fill="none" stroke="#232d47" stroke-width="1"/>
+            <polygon points="100,35 150,88 120,150 65,135 40,80" fill="rgba(88, 182, 250, 0.25)" stroke="#58b6fa" stroke-width="2"/>
+            <text x="100" y="14" fill="#8491a8" font-size="9" text-anchor="middle">Emotional Reg</text>
+            <text x="180" y="78" fill="#8491a8" font-size="9">Focus</text>
+            <text x="148" y="178" fill="#8491a8" font-size="9">Engagement</text>
+            <text x="52" y="178" fill="#8491a8" font-size="9" text-anchor="end">Task</text>
+            <text x="20" y="78" fill="#8491a8" font-size="9" text-anchor="end">Social</text>
+          </svg>
+        </div>
+
+        <div style="background: var(--border); height: 100%;"></div>
+
+        <!-- Checkins -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; justify-content: space-between;">
+            <strong style="font-size: 14px;">Daily Check-ins</strong>
+            <span style="font-size: 11px; color: var(--coral);">● PM Uneasy Dip</span>
+          </div>
+          <svg viewBox="0 0 400 120" style="width: 100%; height: 120px;">
+            <line x1="20" y1="100" x2="380" y2="100" stroke="#1f273d"/>
+            <path d="M 40 30 L 100 28 L 160 35 L 220 32 L 280 30 L 340 28" fill="none" stroke="#48e29a" stroke-width="2.5"/>
+            <path d="M 40 36 L 100 38 L 160 42 L 220 78 L 280 40 L 340 34" fill="none" stroke="#f87171" stroke-width="2.5"/>
+            <circle cx="220" cy="78" r="6" fill="#f87171" style="cursor: pointer;" onclick="openDrawer('sel')"/>
+            <text x="220" y="115" fill="#f87171" font-size="10" text-anchor="middle" style="cursor: pointer;" onclick="openDrawer('sel')">Day 4 Dip (Click)</text>
+          </svg>
+          <p style="font-size: 12px; color: var(--muted);">First activity student completes before blocks.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Row: Performance Mastery Chart -->
+    <div class="panel">
+      <div style="display: flex; justify-content: space-between; align-items: baseline;">
+        <div>
+          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted);">Performance</span>
+          <h3 style="font-size: 18px; margin-top: 2px;">Mastery estimate over time (Speed & Completion)</h3>
+        </div>
+        <span style="font-size: 11px; color: var(--coral);">Red = Flagged struggle</span>
+      </div>
+      <svg viewBox="0 0 800 100" style="width: 100%; height: 100px; margin-top: 10px;">
+        <line x1="40" y1="50" x2="760" y2="50" stroke="#1f273d" pointer-events="none"/>
+        <line x1="80" y1="50" x2="240" y2="50" stroke="#58b6fa" stroke-width="2" pointer-events="none"/>
+        <line x1="240" y1="50" x2="400" y2="50" stroke="#58b6fa" stroke-width="2" pointer-events="none"/>
+        <line x1="400" y1="50" x2="560" y2="50" stroke="#58b6fa" stroke-width="2" pointer-events="none"/>
+        <line x1="560" y1="50" x2="720" y2="50" stroke="#58b6fa" stroke-width="2" pointer-events="none"/>
+
+        <circle cx="80" cy="50" r="5" fill="#58b6fa"/><text x="80" y="75" fill="#64748b" font-size="11" text-anchor="middle">Hook</text>
+        <circle cx="240" cy="50" r="9" fill="#f87171" style="cursor:pointer;" onclick="openDrawer('intervention')"/><text x="240" y="75" fill="#f87171" font-size="11" font-weight="700" text-anchor="middle" style="cursor:pointer;" onclick="openDrawer('intervention')">Math (Click for 3-Step Plan)</text>
+        <circle cx="400" cy="50" r="5" fill="#58b6fa"/><text x="400" y="75" fill="#64748b" font-size="11" text-anchor="middle">ELA</text>
+        <circle cx="560" cy="50" r="5" fill="#58b6fa"/><text x="560" y="75" fill="#64748b" font-size="11" text-anchor="middle">Science</text>
+        <circle cx="720" cy="50" r="5" fill="#58b6fa"/><text x="720" y="75" fill="#64748b" font-size="11" text-anchor="middle">Art</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 4: STUDENT BLOCKS DECK VIEW -->
+<div class="blocks-view" id="blocks-view">
+  <div class="deck-wrap">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <button class="flip-btn" style="background:#242c3d; color:#fff;" onclick="closeBlocksDemo()">← Back to Profile</button>
+      <span style="font-size: 11px; text-transform: uppercase; color: var(--muted);">Student Deck View</span>
+    </div>
+
+    <header style="text-align: center; margin: 10px 0;">
+      <p style="font-size: 11px; font-weight: 700; color: var(--blue); letter-spacing: 0.15em;">GRADE 2 · SPACE</p>
+      <h2 style="font-size: 24px; margin-top: 4px;">Sunny and her sister on Station Luna</h2>
+      <p style="font-size: 12px; color: var(--muted); margin-top: 4px;"><span id="blocks-done">0</span> of 5 blocks done</p>
+    </header>
+
+    <!-- Mosaic 2-Column Grid -->
+    <div class="mosaic-grid">
+      <!-- 1. Hook Video Card (Full Width) -->
+      <div class="tile tile-start span-2" onclick="openBlockModal('Space Video', 'Watch Sunny and her sister on Station Luna.', '🎬 YouTube Hook Video')">
+        <div style="display:flex; justify-content:space-between;"><span style="font-size:10px; font-weight:800; text-transform:uppercase;">Start</span><strong>1</strong></div>
+        <strong style="font-size: 18px;">Space video</strong>
+        <span style="font-size: 11px; font-weight:700;">Open</span>
+      </div>
+      <!-- 2. ELA (Check) -->
+      <div class="tile tile-check" onclick="openBlockModal('ELA — Sight Words', 'Sunny looked out at the blue planet. Which word is a sight word?', 'blue')">
+        <div style="display:flex; justify-content:space-between;"><span style="font-size:10px; font-weight:800; text-transform:uppercase;">Check</span><strong>2</strong></div>
+        <strong style="font-size: 18px;">ELA</strong>
+        <span style="font-size: 11px; font-weight:700;">Open</span>
+      </div>
+      <!-- 3. Art (Next) -->
+      <div class="tile tile-next" onclick="openBlockModal('Art — Space Patch', 'Draw your team crest for Station Luna.', '🎨 DrawPad Studio')">
+        <div style="display:flex; justify-content:space-between;"><span style="font-size:10px; font-weight:800; text-transform:uppercase;">Next</span><strong>3</strong></div>
+        <strong style="font-size: 18px;">Art</strong>
+        <span style="font-size: 11px; font-weight:700;">Open</span>
+      </div>
+      <!-- 4. Math (Try) -->
+      <div class="tile tile-try" onclick="openBlockModal('Math — Ten Frames', 'Solve: How many tokens make two full rows of 8?', '8 + 8 = 16')">
+        <div style="display:flex; justify-content:space-between;"><span style="font-size:10px; font-weight:800; text-transform:uppercase;">Try</span><strong>4</strong></div>
+        <strong style="font-size: 18px;">Math</strong>
+        <span style="font-size: 11px; font-weight:700;">Open</span>
+      </div>
+      <!-- 5. Riddle (Try) -->
+      <div class="tile tile-try" onclick="openBlockModal('The Floating Riddle', 'Tap clues to solve the mystery of the weightless crate.', 'Weightless Crate')">
+        <div style="display:flex; justify-content:space-between;"><span style="font-size:10px; font-weight:800; text-transform:uppercase;">Try</span><strong>5</strong></div>
+        <strong style="font-size: 18px;">The Floating Riddle</strong>
+        <span style="font-size: 11px; font-weight:700;">Open</span>
+      </div>
+      <!-- Locked Tiles -->
+      <div class="tile locked"><span>🔒 Locked</span></div>
+      <div class="tile locked"><span>🔒 Locked</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Sliding Side Nav Drawer for Intervention & SEL -->
+<div class="drawer-overlay" id="drawer" onclick="if(event.target===this) closeDrawer()">
+  <div class="drawer-card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--coral); letter-spacing: 0.12em;" id="drawer-kicker">Intervention</span>
+      <button class="flip-btn" style="background:#242c3d; color:#fff;" onclick="closeDrawer()">✕</button>
+    </div>
+    <div id="drawer-body" style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1;"></div>
+  </div>
+</div>
+
+<!-- Block Interaction Modal -->
+<div class="modal-overlay" id="block-modal" onclick="if(event.target===this) closeBlockModal()">
+  <div class="modal-card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--blue);">Block Card</span>
+      <button class="flip-btn" style="background:#242c3d; color:#fff;" onclick="closeBlockModal()">✕</button>
+    </div>
+    <h3 id="modal-title" style="font-size: 20px;">Block Title</h3>
+    <p id="modal-desc" style="font-size: 13px; color: var(--muted);">Instructions</p>
+    <div id="modal-body" style="background: #090c14; border-radius: 12px; padding: 18px; text-align: center; font-size: 16px;"></div>
+    <button class="btn-blocks-cta" onclick="markBlockDone()">Turn In Block</button>
+  </div>
+</div>
+
+<!-- 500ms Popover -->
+<div class="popover" id="popover">
+  <div style="font-size: 14px; font-weight: 700;" id="pop-student-name">Student</div>
+  <div style="font-size: 10px; text-transform: uppercase; color: var(--muted); margin-top: 4px;">Current Lesson Blocks</div>
+  <div style="font-size: 12px; color: #94a3b8; margin: 4px 0 10px;">Space Mosaic (5 blocks)</div>
+  <button class="pop-btn" id="pop-cta" onclick="openProfileFromPopover()">View profile</button>
+</div>
+
+<script>
+let currentStudent = 'Drew';
+let popoverTimer = null;
+const popover = document.getElementById('popover');
+const popStudentName = document.getElementById('pop-student-name');
+let doneBlocks = 0;
+
+// 1. Flip Stage: Galaxy <-> Calendar
+function flipFace(face) {
+  const card = document.getElementById('flip-card');
+  const btnG = document.getElementById('btn-galaxy');
+  const btnC = document.getElementById('btn-calendar');
+
+  if (face === 'calendar') {
+    card.classList.add('flipped');
+    btnC.classList.add('active');
+    btnG.classList.remove('active');
+  } else {
+    card.classList.remove('flipped');
+    btnG.classList.add('active');
+    btnC.classList.remove('active');
+  }
+}
+
+function showCalTab(tab) {
+  const grid = document.getElementById('cal-grid-view');
+  const table = document.getElementById('cal-table-view');
+  const tabCal = document.getElementById('tab-cal');
+  const tabSwim = document.getElementById('tab-swim');
+
+  if (tab === 'grid') {
+    grid.style.display = 'grid';
+    table.style.display = 'none';
+    tabCal.classList.add('active');
+    tabSwim.classList.remove('active');
+  } else {
+    grid.style.display = 'none';
+    table.style.display = 'block';
+    tabSwim.classList.add('active');
+    tabCal.classList.remove('active');
+  }
+}
+
+// 2. Student Hover Popover (500ms delay)
+function hoverNode(name, event) {
+  clearTimeout(popoverTimer);
+  popoverTimer = setTimeout(() => {
+    currentStudent = name;
+    popStudentName.textContent = name;
+    const rect = event.target.getBoundingClientRect();
+    popover.style.left = `${rect.left - 80}px`;
+    popover.style.top = `${rect.top - 120}px`;
+    popover.classList.add('visible');
+  }, 500);
+}
+
+function unhoverNode() {
+  clearTimeout(popoverTimer);
+  popover.classList.remove('visible');
+}
+
+function openProfileFromPopover() {
+  unhoverNode();
+  openProfile(currentStudent);
+}
+
+// 3. Navigation: Profile Overlay
+function openProfile(studentName) {
+  currentStudent = studentName;
+  document.getElementById('profile-student-name').textContent = studentName;
+  document.getElementById('profile-view').classList.add('active');
+  document.getElementById('nav-status').textContent = `Student · ${studentName}`;
+  document.getElementById('flip-controls').style.display = 'none';
+}
+
+function closeProfile() {
+  document.getElementById('profile-view').classList.remove('active');
+  document.getElementById('nav-status').textContent = 'Teacher View';
+  document.getElementById('flip-controls').style.display = 'flex';
+}
+
+// 4. Navigation: Blocks Demo
+function openBlocksDemo() {
+  document.getElementById('blocks-view').classList.add('active');
+  document.getElementById('nav-status').textContent = `${currentStudent}'s Device Deck`;
+}
+
+function closeBlocksDemo() {
+  document.getElementById('blocks-view').classList.remove('active');
+  document.getElementById('nav-status').textContent = `Student · ${currentStudent}`;
+}
+
+function goHome() {
+  closeBlocksDemo();
+  closeProfile();
+  flipFace('galaxy');
+}
+
+// 5. Drawer Handling (Intervention & SEL Chat)
+function openDrawer(type) {
+  const drawer = document.getElementById('drawer');
+  const drawerKicker = document.getElementById('drawer-kicker');
+  const drawerBody = document.getElementById('drawer-body');
+
+  if (type === 'intervention') {
+    drawerKicker.textContent = `Intervention · Scaling Ratios · ${currentStudent}`;
+    drawerKicker.style.color = 'var(--coral)';
+    drawerBody.innerHTML = `
+      <div class="misconception-box">
+        <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--coral); letter-spacing: 0.1em;">Target Misconception</span>
+        <p style="font-size: 14px; margin-top: 6px; font-weight: 600;">Adds instead of multiplying when scaling dimensions.</p>
+      </div>
+
+      <div style="margin-top: 4px;">
+        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted); letter-spacing: 0.08em;">3-Step Offline Coaching Plan</span>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+          <div class="step-box"><strong>Step 1: Manipulative Check</strong><br>Hand ${currentStudent} two 4-cube rods. Ask how to double length without counting each cube.</div>
+          <div class="step-box"><strong>Step 2: Partner Scaffolding</strong><br>Pair with Jordan for 1 minute: compare rule for scale factor 2x vs 3x.</div>
+          <div class="step-box"><strong>Step 3: Quick Check</strong><br>Teacher verifies 1 mental scale before re-attempting online block.</div>
+        </div>
+      </div>
+
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn-blocks-cta" style="background: var(--mint); color: #000;" onclick="showToast('✅ Intervention Approved & Logged Offline'); closeDrawer();">Approve & Deliver Offline</button>
+      </div>
+    `;
+  } else {
+    drawerKicker.textContent = `SEL Action Chat · ${currentStudent}`;
+    drawerKicker.style.color = 'var(--blue)';
+    drawerBody.innerHTML = `
+      <p style="font-size: 13px; color: var(--muted);">${currentStudent} checked in uneasy on Day 4 (afternoon). Context: peer group shift.</p>
+      <div class="step-box" style="background: #182239;">
+        <strong>Weaver Coaching Agent:</strong><br>"${currentStudent} seemed hesitant during partner setup. What do you want to check in on tomorrow morning?"
+      </div>
+      <input type="text" placeholder="Type response note..." style="background: #090d17; border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: #fff; margin-top: 8px;">
+      <button class="btn-blocks-cta" style="margin-top: auto;" onclick="closeDrawer()">Save Check-in Note</button>
+    `;
+  }
+  drawer.classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+}
+
+function showToast(msg) {
+  let toast = document.getElementById('toast-banner');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast-banner';
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#10b981;color:#000;font-weight:700;padding:12px 24px;border-radius:999px;box-shadow:0 10px 25px rgba(0,0,0,0.5);z-index:9999;transition:opacity 0.3s;';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+}
+
+// 6. Block Card Modal
+function openBlockModal(title, desc, body) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-desc').textContent = desc;
+  document.getElementById('modal-body').textContent = body;
+  document.getElementById('block-modal').classList.add('open');
+}
+
+function closeBlockModal() {
+  document.getElementById('block-modal').classList.remove('open');
+}
+
+function markBlockDone() {
+  doneBlocks = Math.min(5, doneBlocks + 1);
+  document.getElementById('blocks-done').textContent = doneBlocks;
+  closeBlockModal();
+}
+</script>
+
+</body>
+</html>

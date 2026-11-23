@@ -1,0 +1,45 @@
+.wrapper {
+  position: relative;
+  display: inline-block;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.svg {
+  display: block;
+}
+
+.outline {
+  stroke: rgba(15, 23, 42, 0.12);
+  stroke-width: 1;
+}
+
+.labelLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.label {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The component already stops the JS animation loop for reduced-motion
+   users (see usePrefersReducedMotion in WavyStackBar.tsx). This is a
+   belt-and-suspenders CSS-level guarantee for anything that slips through. */
+@media (prefers-reduced-motion: reduce) {
+  .svg * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

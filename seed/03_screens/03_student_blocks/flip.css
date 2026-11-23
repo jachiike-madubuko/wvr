@@ -1,0 +1,74 @@
+.wv-face-stage { display: grid; }
+.wv-face-stage > .wv-face-layer {
+  grid-area: 1 / 1;
+  transition: opacity 160ms ease;
+}
+.wv-face-stage > .wv-face-layer[data-show="false"] {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wv-face-stage > .wv-face-layer { transition: none; }
+}
+
+.wv-flip-scene {
+  perspective: 2400px;
+}
+
+.wv-flip-card {
+  position: relative;
+  min-height: calc(100vh - 8rem);
+  transform-style: preserve-3d;
+  transition: transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wv-flip-card[data-flipped="calendar"] {
+  transform: rotateY(180deg);
+}
+
+.wv-flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.wv-flip-face--back {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  transform: rotateY(180deg);
+  pointer-events: none;
+}
+
+.wv-flip-card[data-flipped="calendar"] .wv-flip-face--front {
+  pointer-events: none;
+}
+
+.wv-flip-card[data-flipped="calendar"] .wv-flip-face--back {
+  pointer-events: auto;
+}
+
+@keyframes student-shake {
+  0%, 100% { transform: rotate(0deg); }
+  18% { transform: rotate(-16deg); }
+  36% { transform: rotate(14deg); }
+  54% { transform: rotate(-10deg); }
+  72% { transform: rotate(6deg); }
+}
+@keyframes student-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 229, 102, 0.55); }
+  50% { box-shadow: 0 0 0 7px rgba(255, 229, 102, 0); }
+}
+@keyframes student-burst {
+  0% { opacity: 0; transform: translateY(8px) scale(0.4); }
+  25% { opacity: 1; transform: translateY(-6px) scale(1.15); }
+  100% { opacity: 0; transform: translateY(-28px) scale(0.8); }
+}
+.wv-pin-shake { animation: student-shake var(--dur-shake) var(--ease-pin); }
+.wv-pin-glow { animation: student-glow var(--dur-glow) ease-in-out 2; }
+.wv-flip-move {
+  transition: left .5s var(--ease-pin), top .5s var(--ease-pin), width .5s var(--ease-pin), height .5s var(--ease-pin);
+}
+.wv-flip-turn { transition: transform .55s var(--ease-pin); }
+@media (prefers-reduced-motion: reduce) {
+  .wv-pin-shake, .wv-pin-glow, .wv-flip-move, .wv-flip-turn { animation: none; transition: none; }
+}

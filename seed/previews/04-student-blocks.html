@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weavr Student Blocks — Mosaic Preview</title>
+<style>
+  :root {
+    --bg: #090a0f;
+    --card-surface: #12151f;
+    --text-ink: #f6f1ea;
+    --text-muted: #8a8490;
+    --border: #232736;
+
+    /* Weaver Pin Face Tokens */
+    --pin-hook: #f5d442;
+    --pin-hook-ink: #2b2302;
+    --pin-try: #58b6fa;
+    --pin-try-ink: #04243b;
+    --pin-check: #48e29a;
+    --pin-check-ink: #032b17;
+    --pin-next: #c88dfc;
+    --pin-next-ink: #2a0b45;
+
+    --radius-pin: 20px;
+    --radius-pill: 999px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+  }
+
+  .deck-container {
+    width: 100%;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pin-try);
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 6px 0 4px;
+    letter-spacing: -0.02em;
+  }
+  .progress-info {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* YouTube Thumbnail Grid Mosaic */
+  .mosaic-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  /* Base Tile (YouTube thumbnail style) */
+  .tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    min-height: 140px;
+    padding: var(--space-4);
+    border-radius: var(--radius-pin);
+    text-align: left;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s ease;
+    user-select: none;
+  }
+  .tile:hover:not(.locked) {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 10px 24px -6px rgba(0,0,0,0.45);
+  }
+  .tile:active:not(.locked) {
+    transform: scale(0.98);
+  }
+
+  /* Full-width Hook Thumbnail */
+  .tile.span-2 {
+    grid-column: 1 / -1;
+    min-height: 130px;
+  }
+
+  .tile-top {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .tile-role-badge {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+
+  .tile-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.15);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .tile-title {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-top: 10px;
+    letter-spacing: -0.01em;
+  }
+
+  .tile-status {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.75;
+    margin-top: auto;
+    padding-top: 8px;
+  }
+
+  /* Color themes matching FACE from library.ts */
+  .tile-start { background: var(--pin-hook); color: var(--pin-hook-ink); }
+  .tile-try   { background: var(--pin-try); color: var(--pin-try-ink); }
+  .tile-check { background: var(--pin-check); color: var(--pin-check-ink); }
+  .tile-next  { background: var(--pin-next); color: var(--pin-next-ink); }
+
+  /* Locked / Frosted Tiles */
+  .tile.locked {
+    background: #171b26;
+    color: #4b556b;
+    cursor: not-allowed;
+    border: 1px dashed #242c3d;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .tile.locked .lock-icon {
+    font-size: 22px;
+    opacity: 0.6;
+  }
+  .tile.locked .lock-text {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Completed State */
+  .tile.done {
+    filter: saturate(0.85);
+  }
+  .tile.done .tile-status::before {
+    content: "✓ ";
+  }
+
+  /* Modal Overlay (Card Flip Viewer) */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .detail-card {
+    background: #151824;
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    width: 100%;
+    max-width: 480px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+    transform: scale(0.95);
+    transition: transform 0.2s ease;
+  }
+  .modal-overlay.open .detail-card {
+    transform: scale(1);
+  }
+
+  .detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .close-btn {
+    background: #242b3d;
+    color: var(--text-ink);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .detail-well {
+    background: #0c0e15;
+    border: 1px solid #1f2536;
+    border-radius: 16px;
+    padding: 16px;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    justify-content: center;
+  }
+  .choice-row {
+    background: #191f2e;
+    border: 1px solid #28334a;
+    padding: 12px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.15s ease;
+  }
+  .choice-row:hover { background: #222b3f; }
+  .choice-row.selected {
+    border-color: var(--pin-check);
+    background: rgba(72, 226, 154, 0.15);
+    color: #6ee7b7;
+    font-weight: 600;
+  }
+
+  .cta-button {
+    width: 100%;
+    padding: 15px;
+    border-radius: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    background: var(--pin-check);
+    color: var(--pin-check-ink);
+    transition: opacity 0.15s ease;
+  }
+  .cta-button:disabled { opacity: 0.45; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="deck-container">
+  <header>
+    <p class="kicker">Grade 2 · Space</p>
+    <h1>Sunny and her sister on Station Luna</h1>
+    <p class="progress-info"><span id="done-count">0</span> of 5 done</p>
+  </header>
+
+  <!-- YouTube-Thumbnail Style Mosaic Grid -->
+  <div class="mosaic-grid">
+    <!-- Block 1: Hook Video (Full Width) -->
+    <div class="tile tile-start span-2" id="tile-hook" onclick="openBlock(0)">
+      <div class="tile-top">
+        <span class="tile-role-badge">Start</span>
+        <span class="tile-number">1</span>
+      </div>
+      <div class="tile-title">Space video</div>
+      <div class="tile-status" id="status-0">Open</div>
+    </div>
+
+    <!-- Block 2: ELA (Check) -->
+    <div class="tile tile-check" id="tile-ela" onclick="openBlock(1)">
+      <div class="tile-top">
+        <span class="tile-role-badge">Check</span>
+        <span class="tile-number">2</span>
+      </div>
+      <div class="tile-title">ELA</div>
+      <div class="tile-status" id="status-1">Open</div>
+    </div>
+
+    <!-- Block 3: Art (Next) -->
+    <div class="tile tile-next" id="tile-art" onclick="openBlock(2)">
+      <div class="tile-top">
+        <span class="tile-role-badge">Next</span>
+        <span class="tile-number">3</span>
+      </div>
+      <div class="tile-title">Art</div>
+      <div class="tile-status" id="status-2">Open</div>
+    </div>
+
+    <!-- Block 4: Math (Try) -->
+    <div class="tile tile-try" id="tile-math" onclick="openBlock(3)">
+      <div class="tile-top">
+        <span class="tile-role-badge">Try</span>
+        <span class="tile-number">4</span>
+      </div>
+      <div class="tile-title">Math</div>
+      <div class="tile-status" id="status-3">Open</div>
+    </div>
+
+    <!-- Block 5: The Floating Riddle (Try) -->
+    <div class="tile tile-try" id="tile-riddle" onclick="openBlock(4)">
+      <div class="tile-top">
+        <span class="tile-role-badge">Try</span>
+        <span class="tile-number">5</span>
+      </div>
+      <div class="tile-title">The Floating Riddle</div>
+      <div class="tile-status" id="status-4">Open</div>
+    </div>
+
+    <!-- Block 6: Demo (Start / Extra) -->
+    <div class="tile tile-start" id="tile-demo" onclick="openBlock(5)">
+      <div class="tile-top">
+        <span class="tile-role-badge">Demo</span>
+        <span class="tile-number">6</span>
+      </div>
+      <div class="tile-title">Math: Make Ten</div>
+      <div class="tile-status" id="status-5">Open</div>
+    </div>
+
+    <!-- Locked Future Blocks -->
+    <div class="tile locked">
+      <span class="lock-icon">🔒</span>
+      <span class="lock-text">Locked</span>
+    </div>
+    <div class="tile locked">
+      <span class="lock-icon">🔒</span>
+      <span class="lock-text">Locked</span>
+    </div>
+    <div class="tile locked">
+      <span class="lock-icon">🔒</span>
+      <span class="lock-text">Locked</span>
+    </div>
+    <div class="tile locked">
+      <span class="lock-icon">🔒</span>
+      <span class="lock-text">Locked</span>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Flip Viewer -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this) closeModal()">
+  <div class="detail-card">
+    <div class="detail-header">
+      <span class="kicker" id="modal-role">Start</span>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div>
+      <h2 id="modal-title" style="font-size: 22px; font-weight: 700;">Block Title</h2>
+      <p id="modal-instr" style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Instructions</p>
+    </div>
+
+    <div class="detail-well" id="modal-well"></div>
+
+    <button class="cta-button" id="modal-cta" onclick="submitBlock()">Done</button>
+  </div>
+</div>
+
+<script>
+const BLOCKS = [
+  {
+    role: "Start",
+    title: "Space video",
+    instr: "Watch Sunny and her sister on Station Luna.",
+    cta: "I watched the video",
+    render: (well, onValid) => {
+      well.innerHTML = `<div style="text-align: center; padding: 18px 0;"><span style="font-size: 40px;">🎬</span><p style="font-size: 14px; margin-top: 8px; color: #94a3b8;">YouTube Hook: Station Luna</p></div>`;
+      onValid(true);
+    }
+  },
+  {
+    role: "Check",
+    title: "ELA — Sight Word Check",
+    instr: "Sunny looked out at the blue planet. Which word is a sight word?",
+    cta: "Lock in my answer",
+    render: (well, onValid) => {
+      const choices = ["blue", "planet", "window"];
+      well.innerHTML = choices.map(c => `<div class="choice-row" onclick="pickChoice(this)">${c}</div>`).join("");
+      window.pickChoice = (el) => {
+        well.querySelectorAll(".choice-row").forEach(c => c.classList.remove("selected"));
+        el.classList.add("selected");
+        onValid(true);
+      };
+    }
+  },
+  {
+    role: "Next",
+    title: "Art — Design a Space Patch",
+    instr: "Draw your team crest for Station Luna.",
+    cta: "Save patch to bag",
+    render: (well, onValid) => {
+      well.innerHTML = `<div style="text-align: center; padding: 16px 0;"><span style="font-size: 40px;">🎨</span><p style="font-size: 13px; margin-top: 8px; color: #94a3b8;">DrawPad Canvas Interactive</p></div>`;
+      onValid(true);
+    }
+  },
+  {
+    role: "Try",
+    title: "Math — Ten Frames",
+    instr: "Solve: How many tokens make two full rows of 8?",
+    cta: "Submit total",
+    render: (well, onValid) => {
+      well.innerHTML = `<div style="text-align: center; font-size: 24px; font-weight: 700; color: #38bdf8;">8 + 8 = 16</div>`;
+      onValid(true);
+    }
+  },
+  {
+    role: "Try",
+    title: "The Floating Riddle",
+    instr: "Tap clues to solve the mystery of the weightless crate.",
+    cta: "Solve riddle",
+    render: (well, onValid) => {
+      well.innerHTML = `<p style="font-size: 14px; color: #cbd5e1; line-height: 1.5;">I float when you push, but stop when you pull. What am I?</p>`;
+      onValid(true);
+    }
+  },
+  {
+    role: "Demo",
+    title: "Math: Make Ten, space edition",
+    instr: "Combine orbital cubes to reach the target 10.",
+    cta: "Complete demo",
+    render: (well, onValid) => {
+      well.innerHTML = `<div style="text-align: center; font-size: 18px; font-weight: 600; color: #f5d442;">Target: 10</div>`;
+      onValid(true);
+    }
+  }
+];
+
+let activeIdx = 0;
+const doneSet = new Set();
+const modal = document.getElementById("modal");
+const modalRole = document.getElementById("modal-role");
+const modalTitle = document.getElementById("modal-title");
+const modalInstr = document.getElementById("modal-instr");
+const modalWell = document.getElementById("modal-well");
+const modalCta = document.getElementById("modal-cta");
+const doneCount = document.getElementById("done-count");
+
+function openBlock(idx) {
+  activeIdx = idx;
+  const b = BLOCKS[idx];
+  modalRole.textContent = b.role;
+  modalTitle.textContent = b.title;
+  modalInstr.textContent = b.instr;
+  modalCta.textContent = b.cta;
+  modalCta.disabled = true;
+
+  b.render(modalWell, (valid) => {
+    modalCta.disabled = !valid;
+  });
+
+  modal.classList.add("open");
+}
+
+function closeModal() {
+  modal.classList.remove("open");
+}
+
+function submitBlock() {
+  doneSet.add(activeIdx);
+  doneCount.textContent = doneSet.size;
+
+  const tile = document.querySelectorAll(".mosaic-grid .tile")[activeIdx];
+  const status = document.getElementById(`status-${activeIdx}`);
+  if (tile && status) {
+    tile.classList.add("done");
+    status.textContent = "Done";
+  }
+
+  closeModal();
+}
+</script>
+</body>
+</html>

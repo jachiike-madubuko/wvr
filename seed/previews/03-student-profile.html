@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weavr Preview — Student Profile & Intervention Drawer</title>
+<style>
+  :root {
+    --bg: #0b0f19;
+    --panel-bg: #111728;
+    --border: #1e263d;
+    --text: #f6f1ea;
+    --muted: #8491a8;
+
+    --mint: #48e29a;
+    --coral: #f87171;
+    --blue: #58b6fa;
+    --purple: #c084fc;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 24px;
+    display: flex;
+    justify-content: center;
+  }
+  .app-shell {
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+  .kicker {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  h1 { font-size: 32px; font-weight: 700; margin-top: 4px; }
+  .close-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Top SEL Row: Weaver Wheel Left, Check-ins Right */
+  .sel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1px 1.2fr;
+    gap: 24px;
+    align-items: center;
+  }
+  .divider { background: var(--border); height: 100%; }
+
+  .radar-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+  }
+  .radar-svg { width: 260px; height: 260px; }
+
+  .checkins-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .checkins-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .chart-shell {
+    width: 100%;
+    height: 180px;
+    position: relative;
+  }
+
+  /* Performance Line Graph Row */
+  .performance-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .performance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .zoom-controls {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 3px;
+    border-radius: 999px;
+    gap: 2px;
+  }
+  .zoom-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .zoom-btn.active { background: #fff; color: #000; }
+
+  /* Interactive Line Nodes */
+  .node-point {
+    cursor: pointer;
+    transition: r 0.15s ease, filter 0.15s ease;
+  }
+  .node-point:hover {
+    r: 9;
+    filter: drop-shadow(0 0 6px currentColor);
+  }
+
+  /* Sliding Drawer */
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 100;
+  }
+  .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+  .drawer-card {
+    background: #111728;
+    width: 100%;
+    max-width: 460px;
+    height: 100%;
+    padding: 32px 28px;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    transform: translateX(100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .drawer-overlay.open .drawer-card { transform: translateX(0); }
+
+  .drawer-title { font-size: 22px; font-weight: 700; }
+  .misconception-card {
+    background: #182035;
+    border: 1px solid #283454;
+    border-radius: 16px;
+    padding: 16px;
+  }
+  .step-box {
+    background: #1c263f;
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .action-btn {
+    padding: 14px;
+    border-radius: 14px;
+    border: none;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <div class="page-head">
+    <div>
+      <p class="kicker">Student profile</p>
+      <h1>Drew</h1>
+    </div>
+    <button class="close-btn" onclick="alert('Close profile')">Close</button>
+  </div>
+
+  <!-- Top Row: SEL -->
+  <section class="panel">
+    <p class="kicker">SEL · Social Emotional Learning</p>
+    <div class="sel-grid">
+      <!-- Weaver Wheel (Radar) -->
+      <div class="radar-container">
+        <h3 style="font-size: 16px; font-weight: 700;">Weaver Wheel</h3>
+        <svg class="radar-svg" viewBox="0 0 200 200">
+          <!-- Web polygons -->
+          <polygon points="100,20 176,75 147,165 53,165 24,75" fill="none" stroke="#232d47" stroke-width="1" />
+          <polygon points="100,50 145,85 128,139 72,139 55,85" fill="none" stroke="#232d47" stroke-width="1" />
+          <!-- Axes -->
+          <line x1="100" y1="100" x2="100" y2="20" stroke="#232d47" />
+          <line x1="100" y1="100" x2="176" y2="75" stroke="#232d47" />
+          <line x1="100" y1="100" x2="147" y2="165" stroke="#232d47" />
+          <line x1="100" y1="100" x2="53" y2="165" stroke="#232d47" />
+          <line x1="100" y1="100" x2="24" y2="75" stroke="#232d47" />
+          <!-- Student Data Polygon -->
+          <polygon points="100,35 150,88 120,150 65,135 40,80" fill="rgba(88, 182, 250, 0.25)" stroke="#58b6fa" stroke-width="2" />
+          <!-- Labels -->
+          <text x="100" y="14" fill="#8491a8" font-size="9" text-anchor="middle">Emotional Reg</text>
+          <text x="182" y="78" fill="#8491a8" font-size="9">Focus</text>
+          <text x="150" y="178" fill="#8491a8" font-size="9">Engagement</text>
+          <text x="50" y="178" fill="#8491a8" font-size="9" text-anchor="end">Task</text>
+          <text x="18" y="78" fill="#8491a8" font-size="9" text-anchor="end">Social</text>
+        </svg>
+        <p style="font-size: 11px; color: var(--muted);">Focus: scaling ratios focus & frustration management.</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Check-ins Line Graph -->
+      <div class="checkins-container">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <h3 style="font-size: 16px; font-weight: 700;">Daily Check-ins</h3>
+          <div class="checkins-legend">
+            <span style="color: var(--mint);">● AM (Calm)</span>
+            <span style="color: var(--coral);">● PM (Uneasy)</span>
+          </div>
+        </div>
+
+        <svg class="chart-shell" viewBox="0 0 400 160">
+          <!-- Baseline and Day Labels -->
+          <line x1="20" y1="130" x2="380" y2="130" stroke="#1f273d" />
+          <text x="40" y="148" fill="#64748b" font-size="10">Day 1</text>
+          <text x="100" y="148" fill="#64748b" font-size="10">Day 2</text>
+          <text x="160" y="148" fill="#64748b" font-size="10">Day 3</text>
+          <text x="220" y="148" fill="#64748b" font-size="10">Day 4</text>
+          <text x="280" y="148" fill="#64748b" font-size="10">Day 5</text>
+          <text x="340" y="148" fill="#64748b" font-size="10">Day 6</text>
+
+          <!-- AM Line (Mint) -->
+          <path d="M 40 40 L 100 38 L 160 45 L 220 42 L 280 40 L 340 38" fill="none" stroke="#48e29a" stroke-width="2.5" />
+          <!-- PM Line (Coral - Dip on Day 4) -->
+          <path d="M 40 46 L 100 48 L 160 52 L 220 98 L 280 50 L 340 44" fill="none" stroke="#f87171" stroke-width="2.5" />
+
+          <!-- Clickable Point on Day 4 Distressed Check-in -->
+          <circle cx="220" cy="98" r="6" fill="#f87171" class="node-point" onclick="openDrawer('sel')" />
+        </svg>
+        <p style="font-size: 12px; color: #94a3b8;">Click the Day 4 PM dip to open the SEL coaching chat.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bottom Row: Performance (MasteryChart) -->
+  <section class="panel performance-panel">
+    <div class="performance-header">
+      <div>
+        <p class="kicker">Performance</p>
+        <h3 style="font-size: 20px; font-weight: 700; margin-top: 2px;">Mastery estimate over time</h3>
+        <p style="font-size: 13px; color: var(--muted); margin-top: 4px;">This lesson, block by block. Red nodes flag slow time or multiple failed attempts.</p>
+      </div>
+      <div class="zoom-controls">
+        <button class="zoom-btn active">Day</button>
+        <button class="zoom-btn">Week</button>
+        <button class="zoom-btn">Month</button>
+      </div>
+    </div>
+
+    <!-- Performance Line Chart with Struggle Point -->
+    <svg viewBox="0 0 800 120" style="width: 100%; height: 120px;">
+      <line x1="40" y1="60" x2="760" y2="60" stroke="#1f273d" />
+
+      <!-- Nodes -->
+      <!-- Hook (OK) -->
+      <circle cx="80" cy="60" r="5" fill="#58b6fa" />
+      <text x="80" y="90" fill="#64748b" font-size="11" text-anchor="middle">Hook</text>
+
+      <!-- Math (Flagged Struggle - Red) -->
+      <line x1="80" y1="60" x2="240" y2="60" stroke="#58b6fa" stroke-width="2" />
+      <circle cx="240" cy="60" r="7" fill="#f87171" class="node-point" onclick="openDrawer('intervention')" />
+      <text x="240" y="90" fill="#f87171" font-size="11" font-weight="700" text-anchor="middle">Math (Slow / 3 Tries)</text>
+
+      <!-- ELA (OK) -->
+      <line x1="240" y1="60" x2="400" y2="60" stroke="#58b6fa" stroke-width="2" />
+      <circle cx="400" cy="60" r="5" fill="#58b6fa" />
+      <text x="400" y="90" fill="#64748b" font-size="11" text-anchor="middle">ELA</text>
+
+      <!-- Science (OK) -->
+      <line x1="400" y1="60" x2="560" y2="60" stroke="#58b6fa" stroke-width="2" />
+      <circle cx="560" cy="60" r="5" fill="#58b6fa" />
+      <text x="560" y="90" fill="#64748b" font-size="11" text-anchor="middle">Science</text>
+
+      <!-- Art (OK) -->
+      <line x1="560" y1="60" x2="720" y2="60" stroke="#58b6fa" stroke-width="2" />
+      <circle cx="720" cy="60" r="5" fill="#58b6fa" />
+      <text x="720" y="90" fill="#64748b" font-size="11" text-anchor="middle">Art</text>
+    </svg>
+    <p style="font-size: 12px; color: var(--coral);">⚠️ Click the red Math node above to generate a 3-step teacher coaching plan.</p>
+  </section>
+</div>
+
+<!-- Drawer for Intervention & SEL Chat -->
+<div class="drawer-overlay" id="drawer" onclick="if(event.target===this) closeDrawer()">
+  <div class="drawer-card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span class="kicker" id="drawer-kicker">Intervention</span>
+      <button class="close-btn" onclick="closeDrawer()">✕</button>
+    </div>
+
+    <div id="drawer-body" style="display: flex; flex-direction: column; gap: 14px; flex-grow: 1;">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
+<script>
+const drawer = document.getElementById("drawer");
+const drawerKicker = document.getElementById("drawer-kicker");
+const drawerBody = document.getElementById("drawer-body");
+
+function openDrawer(type) {
+  if (type === 'intervention') {
+    drawerKicker.textContent = "Intervention · Scaling Ratios";
+    drawerBody.innerHTML = `
+      <div class="misconception-card">
+        <p class="kicker" style="color: var(--coral);">Target Misconception</p>
+        <p style="font-size: 14px; margin-top: 4px; font-weight: 600;">Adds instead of multiplying when scaling dimensions.</p>
+      </div>
+
+      <div style="margin-top: 10px;">
+        <p class="kicker">3-Step Offline Coaching Plan</p>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+          <div class="step-box"><strong>Step 1: Manipulative Check</strong><br>Hand Drew two 4-cube rods. Ask how to double without adding cubes individually.</div>
+          <div class="step-box"><strong>Step 2: Compare with Partner</strong><br>Pair with Jordan for 1 minute: compare scaling factor definitions.</div>
+          <div class="step-box"><strong>Step 3: Quick Check</strong><br>Provide 1 verbal ratio check before re-attempting block.</div>
+        </div>
+      </div>
+
+      <button class="action-btn" style="background: var(--mint); color: #000;" onclick="closeDrawer()">Approve & Deliver</button>
+    `;
+  } else {
+    drawerKicker.textContent = "SEL Action Chat · Address Uneasy";
+    drawerBody.innerHTML = `
+      <p style="font-size: 13px; color: var(--muted);">Drew checked in uneasy on Day 4 (afternoon). Possible context: peer group change.</p>
+      <div class="step-box" style="background: #141b2e;">
+        <strong>Weaver Coach:</strong><br>"Drew seemed quiet during team math. What do you want to ask at the door tomorrow?"
+      </div>
+      <input type="text" placeholder="Type coaching reply..." style="background: #090d17; border: 1px solid var(--border); border-radius: 10px; padding: 12px; color: #fff; margin-top: 12px;">
+      <button class="action-btn" style="background: var(--blue); color: #000;" onclick="closeDrawer()">Save Note</button>
+    `;
+  }
+  drawer.classList.add("open");
+}
+
+function closeDrawer() {
+  drawer.classList.remove("open");
+}
+</script>
+
+</body>
+</html>

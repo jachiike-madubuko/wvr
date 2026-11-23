@@ -1,0 +1,530 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://weaver.app/schemas/recipe.v1.schema.json",
+  "title": "WeaverRecipeV1",
+  "description": "A lesson RECIPE: locked pedagogy + parameterized context layer. Variations mutate only the context layer and derived surface text while preserving objective, standard, problem structure, and assessment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "meta",
+    "locked",
+    "contextLayer",
+    "pedagogy",
+    "surface",
+    "qa"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^rcp_[a-z0-9]{8,32}$",
+      "description": "Stable recipe id. Variations share recipeId; each variation has its own variationId."
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["createdAt", "updatedAt", "source", "gradeBand", "subject", "title"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "Teacher-facing lesson title. Distinct from surface.title, which may personalize per pack."
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdByTeacherId": {
+          "type": "string",
+          "description": "Supabase auth user uuid. Teacher identity only; never a student id."
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["paste_text", "paste_gdoc", "pdf_extract", "manual"]
+            },
+            "originalTextHash": {
+              "type": "string",
+              "description": "SHA-256 of normalized paste; no raw PII storage obligation beyond content itself."
+            },
+            "titleHint": { "type": "string", "maxLength": 200 }
+          }
+        },
+        "gradeBand": {
+          "type": "string",
+          "enum": ["5", "6", "7", "8", "5-6", "6-7", "7-8", "5-8"]
+        },
+        "subject": { "const": "math" },
+        "locale": { "type": "string", "default": "en-US" },
+        "lineage": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Additive v1.1 lineage pointers. Mirrors recipes.* lineage columns for share/fork graphs.",
+          "required": ["rootRecipeId", "branchKind"],
+          "properties": {
+            "rootRecipeId": {
+              "type": "string",
+              "description": "First ancestor recipe id (equals this recipe when original)."
+            },
+            "parentRecipeId": {
+              "type": ["string", "null"],
+              "description": "Immediate parent. Null for original paste."
+            },
+            "branchKind": {
+              "type": "string",
+              "enum": ["original", "variation_child", "share_regen", "teacher_fork"]
+            },
+            "originVariationSetId": { "type": ["string", "null"] },
+            "originPackId": {
+              "type": ["string", "null"],
+              "pattern": "^pack_[a-z0-9_]+$"
+            }
+          }
+        }
+      }
+    },
+    "locked": {
+      "type": "object",
+      "description": "IMMUTABLE across variations. If a generator changes any of these, QA fails closed.",
+      "additionalProperties": false,
+      "required": [
+        "objective",
+        "standards",
+        "problemStructure",
+        "assessment",
+        "invariants"
+      ],
+      "properties": {
+        "objective": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["statement", "bloomsLevel"],
+          "properties": {
+            "statement": {
+              "type": "string",
+              "minLength": 20,
+              "maxLength": 500,
+              "description": "Learning objective in teacher language. Context-free; no interest nouns."
+            },
+            "bloomsLevel": {
+              "type": "string",
+              "enum": ["remember", "understand", "apply", "analyze", "evaluate", "create"]
+            }
+          }
+        },
+        "standards": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "framework", "grade", "description"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[0-9]\\.[A-Z]+\\.[A-Z]+\\.[0-9]+$",
+                "description": "CCSS-M code from the hardcoded MVP allowlist, e.g. 7.RP.A.2"
+              },
+              "framework": { "const": "CCSS-M" },
+              "grade": { "type": "string", "enum": ["5", "6", "7", "8"] },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "problemStructure": {
+          "type": "object",
+          "description": "Symbolic / structural skeleton. Numbers may be slots; relationships are fixed.",
+          "additionalProperties": false,
+          "required": ["itemType", "steps", "quantities", "relations", "answerKey"],
+          "properties": {
+            "itemType": {
+              "type": "string",
+              "enum": [
+                "worked_example",
+                "guided_practice",
+                "independent_practice",
+                "word_problem_set",
+                "exit_ticket"
+              ]
+            },
+            "steps": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "kind", "promptTemplate"],
+                "properties": {
+                  "id": { "type": "string", "pattern": "^step_[0-9]+$" },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "setup",
+                      "represent",
+                      "compute",
+                      "interpret",
+                      "check"
+                    ]
+                  },
+                  "promptTemplate": {
+                    "type": "string",
+                    "description": "May include {{slots}}; must not embed interest-specific nouns in locked form."
+                  },
+                  "expectedOperation": {
+                    "type": "string",
+                    "description": "e.g. proportion, linear_equation, unit_rate, percent_of"
+                  }
+                }
+              }
+            },
+            "quantities": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "role", "valueType"],
+                "properties": {
+                  "id": { "type": "string", "pattern": "^q_[a-z0-9_]+$" },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "given",
+                      "unknown",
+                      "intermediate",
+                      "constraint",
+                      "unit"
+                    ]
+                  },
+                  "symbol": { "type": "string" },
+                  "valueType": {
+                    "type": "string",
+                    "enum": ["integer", "decimal", "fraction", "percent", "ratio"]
+                  },
+                  "lockedValue": {
+                    "description": "If set, all variations must use this exact value (assessment integrity).",
+                    "oneOf": [
+                      { "type": "number" },
+                      { "type": "string" },
+                      { "type": "null" }
+                    ]
+                  },
+                  "slot": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "If true, context layer may substitute a value within bounds."
+                  },
+                  "bounds": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "min": { "type": "number" },
+                      "max": { "type": "number" },
+                      "mustRemainEquivalent": {
+                        "type": "boolean",
+                        "description": "Substitutions must preserve mathematical equivalence class."
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "relations": {
+              "type": "array",
+              "description": "Symbolic constraints that QA verifies (e.g. a/b = c/d).",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "expression"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "expression": {
+                    "type": "string",
+                    "description": "Sympy-compatible or structured equation string over quantity ids."
+                  },
+                  "mustHold": { "type": "boolean", "default": true }
+                }
+              }
+            },
+            "answerKey": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["format", "canonical"],
+              "properties": {
+                "format": {
+                  "type": "string",
+                  "enum": ["number", "fraction", "expression", "multi_part"]
+                },
+                "canonical": {
+                  "description": "Locked correct answer(s). Variations may rephrase stems but not change this."
+                },
+                "acceptableAlternates": {
+                  "type": "array",
+                  "items": {}
+                },
+                "rubricNotes": { "type": "string", "maxLength": 1000 }
+              }
+            }
+          }
+        },
+        "assessment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "successCriteria"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["exit_ticket", "formative_check", "practice_set", "quiz_item"]
+            },
+            "successCriteria": { "type": "string", "minLength": 10 },
+            "points": { "type": "number", "minimum": 0 },
+            "timeMinutes": { "type": "number", "minimum": 1, "maximum": 90 }
+          }
+        },
+        "invariants": {
+          "type": "array",
+          "description": "Human-readable + machine-checkable promises across all variations.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "rule"],
+            "properties": {
+              "id": { "type": "string" },
+              "rule": {
+                "type": "string",
+                "enum": [
+                  "same_objective",
+                  "same_standards",
+                  "same_answer_key",
+                  "same_operations",
+                  "same_cognitive_demand",
+                  "reading_level_band",
+                  "no_student_pii",
+                  "depth_interest_in_quantities"
+                ]
+              },
+              "params": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "contextLayer": {
+      "type": "object",
+      "description": "PARAMETERIZED. Only this layer + surface text may change per interest group. DEPTH rule: interests bind to quantities, units, constraints, or scenario mechanics — never decorative nouns alone.",
+      "additionalProperties": false,
+      "required": ["interestGroup", "bindings", "depth"],
+      "properties": {
+        "interestGroup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packId", "label"],
+          "properties": {
+            "packId": {
+              "type": "string",
+              "pattern": "^pack_[a-z0-9_]+$",
+              "description": "References /context-packs/*.json curated pack."
+            },
+            "label": { "type": "string" },
+            "packVersion": { "type": "string" }
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Maps locked quantity/slots → interest-grounded values from the Context Pack.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["quantityId", "bindingKind", "value"],
+            "properties": {
+              "quantityId": { "type": "string" },
+              "bindingKind": {
+                "type": "string",
+                "enum": [
+                  "unit",
+                  "entity",
+                  "rate_context",
+                  "constraint_narrative",
+                  "setting",
+                  "numeric_substitute"
+                ]
+              },
+              "value": {},
+              "packFactId": {
+                "type": "string",
+                "description": "Id of vetted fact from Context Pack used to ground this binding."
+              },
+              "depthContribution": {
+                "type": "string",
+                "enum": ["structural", "numeric", "unit", "constraint"],
+                "description": "structural/numeric/unit/constraint = DEPTH pass. Decorative setting alone = fail."
+              }
+            }
+          }
+        },
+        "depth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["score", "rationale", "passes"],
+          "properties": {
+            "score": { "type": "number", "minimum": 0, "maximum": 1 },
+            "passes": {
+              "type": "boolean",
+              "description": "true iff at least one binding has depthContribution in structural|numeric|unit|constraint AND interest noun appears in quantitative frame."
+            },
+            "rationale": { "type": "string", "maxLength": 500 }
+          }
+        },
+        "readingLevel": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "targetGrade": { "type": "number" },
+            "fleschKincaidEstimate": { "type": "number" }
+          }
+        }
+      }
+    },
+    "pedagogy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tags", "passionPedagogy"],
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "interest_personalization",
+              "worked_example",
+              "concrete_representational_abstract",
+              "productive_struggle",
+              "formative_assessment",
+              "spaced_practice",
+              "word_problem",
+              "real_world_modeling"
+            ]
+          }
+        },
+        "passionPedagogy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "mechanism"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "mechanism": {
+              "type": "string",
+              "enum": [
+                "walkington_interest_in_structure",
+                "context_pack_grounded",
+                "none"
+              ]
+            },
+            "citation": {
+              "type": "string",
+              "default": "Walkington et al. interest-personalized algebra"
+            }
+          }
+        }
+      }
+    },
+    "surface": {
+      "type": "object",
+      "description": "Teacher-facing rendered lesson text derived from locked + contextLayer. Diff view compares surface fields across variations.",
+      "additionalProperties": false,
+      "required": ["title", "hook", "body", "problems", "assessmentPrompt"],
+      "properties": {
+        "title": { "type": "string", "maxLength": 160 },
+        "hook": { "type": "string", "maxLength": 800 },
+        "body": { "type": "string", "maxLength": 8000 },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stepId", "prompt"],
+            "properties": {
+              "stepId": { "type": "string" },
+              "prompt": { "type": "string" },
+              "teacherNote": { "type": "string" }
+            }
+          }
+        },
+        "assessmentPrompt": { "type": "string" },
+        "materials": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "qa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["pending", "passed", "failed", "flagged"]
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "result"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "schema_valid",
+                  "locked_fields_unchanged",
+                  "symbolic_math",
+                  "answer_key_stable",
+                  "reading_level",
+                  "standards_allowlist",
+                  "depth_rule",
+                  "pii_scan",
+                  "teacher_report"
+                ]
+              },
+              "result": {
+                "type": "string",
+                "enum": ["pass", "fail", "warn", "skip"]
+              },
+              "detail": { "type": "string" },
+              "measured": {}
+            }
+          }
+        },
+        "errorReportId": {
+          "type": "string",
+          "description": "Optional teacher-flagged error ticket id."
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "description": "Explicit contract: no student PII fields exist on this object or related tables.",
+      "additionalProperties": false,
+      "properties": {
+        "studentPiiFields": {
+          "type": "array",
+          "const": [],
+          "description": "MUST remain empty forever."
+        },
+        "classInterestTagsOnly": { "const": true },
+        "rosterAllowed": { "const": false }
+      }
+    }
+  }
+}

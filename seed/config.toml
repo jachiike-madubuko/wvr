@@ -1,0 +1,12 @@
+[core]
+workspace_base = "./"
+default_agent = "CodeActAgent"
+
+[llm]
+model = "gemini/gemini-2.5-pro"
+api_key = "ENV_VAR"
+temperature = 0.0
+
+[agent]
+instruction_file = "AGENTS.md"
+system_prompt_filename = ".openhands_instructions"

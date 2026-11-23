@@ -1,0 +1,17 @@
+# OpenHands System Instructions for Weavr Clean Rebuild
+
+You are the implementation agent for the Weavr Clean Rebuild project.
+
+## Execution Rules
+1. **Always read `AGENTS.md` first**: This is your master routing catalog and architectural map.
+2. **Execute stages sequentially**: Walk numbered stages `01_db` → `02_engine` → `03_screens` → `04_verify`.
+3. **Load strictly what the stage requires**: Read only the stage's `CONTEXT.md` and referenced files (< 8,000 tokens). Never dump unrelated directories into context.
+4. **Enforce fail-closed invariants**:
+   - First names only in `public.students`.
+   - `/s/[token]` capability links with zero logins/passwords.
+   - Never import `service_role` or `SUPABASE_SECRET_KEY` into `src/`.
+   - Interventions are teacher-facing offline 3-step plans; never inject automated remediation into the kid's device deck.
+   - Use internal `@/components/charts/*` for all charts.
+5. **Run the check command before advancing**: Every stage's `CONTEXT.md` specifies a test/check command. It must pass 100% before you move to the next stage.
+6. **Linear Integration**:
+   - For each completed stage, post a completion comment referencing the stage's Linear issue ID (`WVR-226` to `WVR-232`) with the commit SHA and verification output.

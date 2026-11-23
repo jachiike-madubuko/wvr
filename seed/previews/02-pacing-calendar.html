@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weavr Preview — Pace Calendar & Wavy Stacks</title>
+<style>
+  :root {
+    --bg: #0b0e17;
+    --surface: #131826;
+    --border: #232c3f;
+    --text: #f6f1ea;
+    --muted: #8b9bb4;
+
+    /* Pacing Status Colors */
+    --pace-ahead: #48e29a;
+    --pace-on: #58b6fa;
+    --pace-behind: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 1000px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+  .title-group h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .title-group p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .btn-toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-toggle.active {
+    background: #fff;
+    color: #000;
+  }
+
+  /* Calendar 5-Day Week Grid */
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+  .day-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 280px;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+  }
+  .day-card:hover {
+    transform: translateY(-2px);
+    border-color: #3b476b;
+  }
+  .day-card.today {
+    border: 1.5px solid var(--pace-on);
+    box-shadow: 0 0 20px -5px rgba(88, 182, 250, 0.25);
+  }
+  .day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .day-name { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .day-number { font-size: 20px; font-weight: 800; }
+  .today-badge { font-size: 10px; font-weight: 800; color: var(--pace-on); text-transform: uppercase; }
+
+  /* SVG Wavy Stacked Bar */
+  .wavy-container {
+    width: 100%;
+    height: 110px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #0d111a;
+    border: 1px solid #1a2233;
+    position: relative;
+  }
+  .wavy-container svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Metrics Summary */
+  .day-metrics {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+  /* Swimlane Pacing Table Section */
+  .swimlane-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+    margin-top: 10px;
+  }
+  .swimlane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .swimlane-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .swimlane-table th {
+    text-align: left;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .swimlane-table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .status-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .pill-ahead { background: rgba(72, 226, 154, 0.15); color: var(--pace-ahead); }
+  .pill-on { background: rgba(88, 182, 250, 0.15); color: var(--pace-on); }
+  .pill-behind { background: rgba(248, 113, 113, 0.15); color: var(--pace-behind); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="title-group">
+      <p style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--pace-on); letter-spacing: 0.12em;">Pacing Dashboard</p>
+      <h1>November 2026 — Week 3</h1>
+      <p>Predicted pacing distributions and completion timelines across Room 204</p>
+    </div>
+    <div class="controls">
+      <button class="btn-toggle active" id="btn-grid" onclick="showView('grid')">Wavy Calendar</button>
+      <button class="btn-toggle" id="btn-table" onclick="showView('table')">Swimlane Table</button>
+    </div>
+  </div>
+
+  <!-- View 1: Wavy Calendar Grid -->
+  <div class="calendar-grid" id="grid-view">
+    <!-- Mon 17 -->
+    <div class="day-card" onclick="alert('Open Monday schedule')">
+      <div class="day-header">
+        <span class="day-name">Mon</span>
+        <span class="day-number">17</span>
+      </div>
+      <div class="wavy-container">
+        <svg viewBox="0 0 100 60" preserveAspectRatio="none">
+          <path d="M 0 0 L 100 0 L 100 25 Q 75 30 50 20 T 0 25 Z" fill="#48e29a" />
+          <path d="M 0 25 Q 25 15 50 20 T 100 25 L 100 48 Q 75 52 50 45 T 0 50 Z" fill="#58b6fa" />
+          <path d="M 0 50 Q 25 40 50 45 T 100 48 L 100 60 L 0 60 Z" fill="#f87171" />
+        </svg>
+      </div>
+      <div class="day-metrics">
+        <div class="metric-row"><span><span class="dot" style="background:#48e29a;"></span>Ahead</span><span>40%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#58b6fa;"></span>On Pace</span><span>45%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#f87171;"></span>Behind</span><span>15%</span></div>
+      </div>
+    </div>
+
+    <!-- Tue 18 -->
+    <div class="day-card" onclick="alert('Open Tuesday schedule')">
+      <div class="day-header">
+        <span class="day-name">Tue</span>
+        <span class="day-number">18</span>
+      </div>
+      <div class="wavy-container">
+        <svg viewBox="0 0 100 60" preserveAspectRatio="none">
+          <path d="M 0 0 L 100 0 L 100 30 Q 75 25 50 32 T 0 28 Z" fill="#48e29a" />
+          <path d="M 0 28 Q 25 35 50 32 T 100 30 L 100 52 Q 75 48 50 54 T 0 50 Z" fill="#58b6fa" />
+          <path d="M 0 50 Q 25 55 50 54 T 100 52 L 100 60 L 0 60 Z" fill="#f87171" />
+        </svg>
+      </div>
+      <div class="day-metrics">
+        <div class="metric-row"><span><span class="dot" style="background:#48e29a;"></span>Ahead</span><span>50%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#58b6fa;"></span>On Pace</span><span>38%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#f87171;"></span>Behind</span><span>12%</span></div>
+      </div>
+    </div>
+
+    <!-- Wed 19 (Today) -->
+    <div class="day-card today" onclick="alert('Open Wednesday schedule')">
+      <div class="day-header">
+        <div>
+          <span class="day-name">Wed</span>
+          <span class="today-badge"> · Today</span>
+        </div>
+        <span class="day-number">19</span>
+      </div>
+      <div class="wavy-container">
+        <svg viewBox="0 0 100 60" preserveAspectRatio="none">
+          <path d="M 0 0 L 100 0 L 100 20 Q 75 26 50 18 T 0 22 Z" fill="#48e29a" />
+          <path d="M 0 22 Q 25 15 50 18 T 100 20 L 100 45 Q 75 52 50 42 T 0 44 Z" fill="#58b6fa" />
+          <path d="M 0 44 Q 25 38 50 42 T 100 45 L 100 60 L 0 60 Z" fill="#f87171" />
+        </svg>
+      </div>
+      <div class="day-metrics">
+        <div class="metric-row"><span><span class="dot" style="background:#48e29a;"></span>Ahead</span><span>35%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#58b6fa;"></span>On Pace</span><span>42%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#f87171;"></span>Behind</span><span>23%</span></div>
+      </div>
+    </div>
+
+    <!-- Thu 20 (Predicted) -->
+    <div class="day-card" onclick="alert('Open Thursday schedule')">
+      <div class="day-header">
+        <span class="day-name">Thu</span>
+        <span class="day-number">20</span>
+      </div>
+      <div class="wavy-container">
+        <svg viewBox="0 0 100 60" preserveAspectRatio="none">
+          <path d="M 0 0 L 100 0 L 100 35 Q 75 42 50 30 T 0 32 Z" fill="#48e29a" />
+          <path d="M 0 32 Q 25 24 50 30 T 100 35 L 100 52 Q 75 56 50 50 T 0 50 Z" fill="#58b6fa" />
+          <path d="M 0 50 Q 25 46 50 50 T 100 52 L 100 60 L 0 60 Z" fill="#f87171" />
+        </svg>
+      </div>
+      <div class="day-metrics">
+        <div class="metric-row"><span><span class="dot" style="background:#48e29a;"></span>Ahead</span><span>55%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#58b6fa;"></span>On Pace</span><span>30%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#f87171;"></span>Behind</span><span>15%</span></div>
+      </div>
+    </div>
+
+    <!-- Fri 21 (Predicted) -->
+    <div class="day-card" onclick="alert('Open Friday schedule')">
+      <div class="day-header">
+        <span class="day-name">Fri</span>
+        <span class="day-number">21</span>
+      </div>
+      <div class="wavy-container">
+        <svg viewBox="0 0 100 60" preserveAspectRatio="none">
+          <path d="M 0 0 L 100 0 L 100 42 Q 75 38 50 44 T 0 38 Z" fill="#48e29a" />
+          <path d="M 0 38 Q 25 46 50 44 T 100 42 L 100 54 Q 75 52 50 56 T 0 52 Z" fill="#58b6fa" />
+          <path d="M 0 52 Q 25 58 50 56 T 100 54 L 100 60 L 0 60 Z" fill="#f87171" />
+        </svg>
+      </div>
+      <div class="day-metrics">
+        <div class="metric-row"><span><span class="dot" style="background:#48e29a;"></span>Ahead</span><span>65%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#58b6fa;"></span>On Pace</span><span>25%</span></div>
+        <div class="metric-row"><span><span class="dot" style="background:#f87171;"></span>Behind</span><span>10%</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- View 2: Swimlane Pacing Table -->
+  <div class="swimlane-section" id="table-view" style="display: none;">
+    <div class="swimlane-header">
+      <h3 style="font-size: 17px; font-weight: 700;">Student Swimlanes by Subject</h3>
+      <div style="font-size: 12px; color: var(--muted);">Filter: All Subjects</div>
+    </div>
+    <table class="swimlane-table">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Math Pacing</th>
+          <th>ELA Pacing</th>
+          <th>Science Pacing</th>
+          <th>Predicted Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight: 600;">Jordan</td>
+          <td><span class="status-pill pill-ahead">Fast (+12m)</span></td>
+          <td><span class="status-pill pill-ahead">Fast (+8m)</span></td>
+          <td><span class="status-pill pill-on">On Pace</span></td>
+          <td><span class="status-pill pill-ahead">Ahead</span></td>
+          <td><button class="btn-toggle" style="padding: 4px 10px; font-size: 11px;">Enrich</button></td>
+        </tr>
+        <tr>
+          <td style="font-weight: 600;">Drew</td>
+          <td><span class="status-pill pill-behind">Slow (-18m)</span></td>
+          <td><span class="status-pill pill-on">On Pace</span></td>
+          <td><span class="status-pill pill-behind">Slow (-10m)</span></td>
+          <td><span class="status-pill pill-behind">Behind</span></td>
+          <td><button class="btn-toggle" style="padding: 4px 10px; font-size: 11px; color: var(--pace-behind);">Plan Intervention</button></td>
+        </tr>
+        <tr>
+          <td style="font-weight: 600;">Sam</td>
+          <td><span class="status-pill pill-on">On Pace</span></td>
+          <td><span class="status-pill pill-on">On Pace</span></td>
+          <td><span class="status-pill pill-ahead">Fast (+5m)</span></td>
+          <td><span class="status-pill pill-on">On Pace</span></td>
+          <td><button class="btn-toggle" style="padding: 4px 10px; font-size: 11px;">View</button></td>
+        </tr>
+        <tr>
+          <td style="font-weight: 600;">Taylor</td>
+          <td><span class="status-pill pill-behind">Slow (-15m)</span></td>
+          <td><span class="status-pill pill-behind">Slow (-12m)</span></td>
+          <td><span class="status-pill pill-on">On Pace</span></td>
+          <td><span class="status-pill pill-behind">Behind</span></td>
+          <td><button class="btn-toggle" style="padding: 4px 10px; font-size: 11px; color: var(--pace-behind);">Plan Intervention</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function showView(view) {
+  const grid = document.getElementById("grid-view");
+  const table = document.getElementById("table-view");
+  const btnGrid = document.getElementById("btn-grid");
+  const btnTable = document.getElementById("btn-table");
+
+  if (view === "grid") {
+    grid.style.display = "grid";
+    table.style.display = "none";
+    btnGrid.classList.add("active");
+    btnTable.classList.remove("active");
+  } else {
+    grid.style.display = "none";
+    table.style.display = "block";
+    btnTable.classList.add("active");
+    btnGrid.classList.remove("active");
+  }
+}
+</script>
+
+</body>
+</html>
