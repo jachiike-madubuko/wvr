@@ -8,12 +8,19 @@
     "test:db": "node scripts/test-migrations.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "node scripts/migrate.mjs --seed",
-    "verify:db": "npm run check:env && npm run check:migrations && npm run test:db"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify:db": "npm run check:env && npm run check:migrations && npm run test:db",
+    "verify": "npm run verify:db && npm run typecheck && npm test"
   },
   "dependencies": {
     "pg": "^8.16.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.4"
+    "@electric-sql/pglite": "^0.5.4",
+    "@types/node": "^20",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }
