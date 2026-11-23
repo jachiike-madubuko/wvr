@@ -4,14 +4,14 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
+const MIGRATIONS_DIR = join(ROOT, "db", "migrations");
 
 const files = readdirSync(MIGRATIONS_DIR)
   .filter((f) => f.endsWith(".sql"))
   .sort();
 
 if (files.length === 0) {
-  console.error("check-migrations: no .sql migrations found in supabase/migrations/");
+  console.error("check-migrations: no .sql migrations found in db/migrations/");
   process.exit(1);
 }
 
@@ -32,9 +32,8 @@ for (const file of files) {
   expectedSeq = seq + 1;
 
   const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
-  if (/grant\b[\s\S]{0,80}\bto\s+(anon|authenticated)\b[\s\S]{0,40}service_role/i.test(sql) ||
-      /grant\s+service_role\s+to\s+(anon|authenticated)/i.test(sql)) {
-    problems.push(`${file}: must not grant service_role to anon or authenticated`);
+  if (/\b(auth\.users|auth\.uid\(|service_role)\b/i.test(sql)) {
+    problems.push(`${file}: contains Supabase-specific auth/service_role reference instead of native Neon Postgres`);
   }
 
   const studentsMatch = /create\s+table\s+public\.students\s*\(([\s\S]*?)\);/i.exec(sql);
@@ -52,4 +51,4 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`check-migrations: ok (${files.length} monotonic migrations: ${files[0]} .. ${files[files.length - 1]})`);
+console.log(`check-migrations: ok (${files.length} monotonic Neon migrations: ${files[0]} .. ${files[files.length - 1]})`);

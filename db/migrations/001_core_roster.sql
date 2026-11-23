@@ -1,9 +1,19 @@
--- Weaver data layer: Stage 01 Core Roster & PII Gate.
+-- Weaver data layer (Neon / Lakebase Postgres): Stage 01 Core Roster & PII Gate.
 --
 -- Invariants:
 --   1. Every tenant-scoped row carries teacher_id (or class -> teacher) and org_id.
 --   2. public.students carries ONLY first_name (no last_name, email, password, photo, login).
 --   3. Every function in public pins search_path = ''.
+--   4. App requests set transaction-local `app.teacher_id` via set_config(..., true).
+
+create or replace function public.current_teacher_id()
+returns uuid
+language sql
+stable
+set search_path = ''
+as $$
+  select nullif(current_setting('app.teacher_id', true), '')::uuid
+$$;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -46,7 +56,7 @@ create trigger orgs_set_updated_at
   for each row execute function public.set_updated_at();
 
 create table public.teachers (
-  id uuid primary key references auth.users (id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
   org_id uuid references public.orgs (id) on delete set null,
   display_name text
     check (display_name is null or length(btrim(display_name)) between 1 and 120),
@@ -59,26 +69,6 @@ create index teachers_org_id_idx on public.teachers (org_id);
 create trigger teachers_set_updated_at
   before update on public.teachers
   for each row execute function public.set_updated_at();
-
-create or replace function public.handle_new_auth_user()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  insert into public.teachers (id)
-  values (new.id)
-  on conflict (id) do nothing;
-  return new;
-end;
-$$;
-
-revoke all on function public.handle_new_auth_user() from public, anon, authenticated;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_auth_user();
 
 -- ---------------------------------------------------------------------------
 -- Classes & Students (First Name Only)
@@ -229,7 +219,7 @@ begin
 end;
 $$;
 
-revoke all on function public.enforce_pii_gate() from public, anon, authenticated;
+revoke all on function public.enforce_pii_gate() from public;
 
 create trigger recipes_enforce_pii_gate
   before insert or update of pii_scan_id, teacher_id on public.recipes
@@ -287,7 +277,7 @@ begin
 end;
 $$;
 
-revoke all on function public.enforce_known_pack_ids() from public, anon, authenticated;
+revoke all on function public.enforce_known_pack_ids() from public;
 
 create trigger variation_sets_enforce_known_pack_ids
   before insert or update of pack_ids on public.variation_sets

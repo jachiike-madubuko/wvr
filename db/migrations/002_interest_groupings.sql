@@ -102,14 +102,14 @@ alter table public.group_memberships enable row level security;
 alter table public.group_membership_events enable row level security;
 
 create policy group_memberships_all_own on public.group_memberships
-  for all to authenticated
+  for all to public
   using (
     exists (
       select 1 from public.students s
       join public.classes c on c.id = s.class_id
       where s.id = group_memberships.student_id
         and s.class_id = group_memberships.class_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   )
   with check (
@@ -118,38 +118,34 @@ create policy group_memberships_all_own on public.group_memberships
       join public.classes c on c.id = s.class_id
       where s.id = group_memberships.student_id
         and s.class_id = group_memberships.class_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   );
 
 create policy group_membership_events_select_own on public.group_membership_events
-  for select to authenticated
+  for select to public
   using (
     exists (
       select 1 from public.students s
       join public.classes c on c.id = s.class_id
       where s.id = group_membership_events.student_id
         and s.class_id = group_membership_events.class_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   );
 
 create policy group_membership_events_insert_own on public.group_membership_events
-  for insert to authenticated
+  for insert to public
   with check (
-    actor_id = (select auth.uid())
+    actor_id = (select public.current_teacher_id())
     and exists (
       select 1 from public.students s
       join public.classes c on c.id = s.class_id
       where s.id = group_membership_events.student_id
         and s.class_id = group_membership_events.class_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   );
-
-revoke all on public.group_memberships from anon;
-revoke all on public.group_membership_events from anon;
-revoke update, delete, truncate on public.group_membership_events from authenticated;
 
 create or replace function public.move_student_group(
   p_student_id uuid,
@@ -162,10 +158,17 @@ security invoker
 set search_path = ''
 as $$
 declare
+  v_teacher_id uuid;
   v_class_id uuid;
   v_stored_pack text;
   v_stored_version integer;
 begin
+  v_teacher_id := (select public.current_teacher_id());
+  if v_teacher_id is null then
+    raise exception 'teacher session required'
+      using errcode = 'insufficient_privilege';
+  end if;
+
   if p_student_id is null or p_to_pack_id is null or p_expected_version is null then
     raise exception 'student, pack and expected version are required'
       using errcode = 'check_violation';
@@ -217,16 +220,11 @@ begin
   insert into public.group_membership_events
     (class_id, student_id, from_pack_id, to_pack_id, actor, actor_id)
   values
-    (v_class_id, p_student_id, v_stored_pack, p_to_pack_id, 'teacher', (select auth.uid()));
+    (v_class_id, p_student_id, v_stored_pack, p_to_pack_id, 'teacher', v_teacher_id);
 
   return v_stored_version + 1;
 end;
 $$;
-
-revoke all on function public.move_student_group(uuid, text, integer)
-  from public, anon;
-grant execute on function public.move_student_group(uuid, text, integer)
-  to authenticated;
 
 comment on function public.move_student_group(uuid, text, integer) is
   'Move a teacher-owned student to a context pack group. Versioned: raises VERSION_CONFLICT when p_expected_version differs from the stored version (0 when no row). Same-pack moves are no-ops.';

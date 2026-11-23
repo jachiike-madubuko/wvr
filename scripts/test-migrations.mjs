@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Applies every migration in supabase/migrations/ to a real Postgres running in
- * WASM (PGlite), then asserts tenant isolation, first-name-only constraints,
- * anonymous capability path security, and optimistic concurrency.
+ * Applies every migration in db/migrations/ to Postgres in WASM (PGlite) under
+ * Neon's exact least-privilege role model (`weavr_app` + `app.teacher_id`),
+ * then asserts tenant isolation, first-name-only constraints, anonymous
+ * capability path security, and optimistic concurrency.
  */
 
 import { readFileSync, readdirSync } from "node:fs";
@@ -12,43 +13,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
-
-const SUPABASE_SHIM = `
-create role anon nologin noinherit;
-create role authenticated nologin noinherit;
-create role service_role nologin noinherit bypassrls;
-
-grant usage on schema public to anon, authenticated, service_role;
-alter default privileges in schema public
-  grant all on tables to anon, authenticated, service_role;
-alter default privileges in schema public
-  grant all on sequences to anon, authenticated, service_role;
-
-create schema auth;
-grant usage on schema auth to anon, authenticated, service_role;
-
-create table auth.users (
-  id uuid primary key,
-  email text
-);
-
-create or replace function auth.uid()
-returns uuid
-language sql
-stable
-as $shim$
-  select nullif(current_setting('test.user_id', true), '')::uuid
-$shim$;
-
-create or replace function auth.jwt()
-returns jsonb
-language sql
-stable
-as $shim$
-  select coalesce(nullif(current_setting('test.jwt_claims', true), ''), '{}')::jsonb
-$shim$;
-`;
+const MIGRATIONS_DIR = join(ROOT, "db", "migrations");
+const SEED_PATH = join(ROOT, "db", "seed.sql");
 
 const TEACHER_A = "11111111-1111-4111-8111-111111111111";
 const TEACHER_B = "22222222-2222-4222-8222-222222222222";
@@ -103,34 +69,40 @@ async function refusesCode(db, sql, params, code) {
 }
 
 async function asTeacher(db, uid, fn) {
-  await db.exec(`set role authenticated; set test.user_id = '${uid}';`);
+  await db.exec(`set role weavr_app; select set_config('app.teacher_id', '${uid}', false);`);
   try {
     return await fn();
   } finally {
-    await db.exec("reset role; set test.user_id = '';");
+    await db.exec("reset role; select set_config('app.teacher_id', '', false);");
   }
 }
 
-async function asAnon(db, fn) {
-  await db.exec("set role anon;");
+async function asAnonApp(db, fn) {
+  await db.exec("set role weavr_app; select set_config('app.teacher_id', '', false);");
   try {
     return await fn();
   } finally {
-    await db.exec("reset role;");
+    await db.exec("reset role; select set_config('app.teacher_id', '', false);");
   }
 }
 
 const db = new PGlite({ extensions: { pgcrypto } });
-await db.exec(SUPABASE_SHIM);
 await db.exec(`
   create schema if not exists extensions;
   create extension if not exists pgcrypto with schema extensions;
   grant usage on schema extensions to public;
+
+  create role weavr_app nologin noinherit;
+  grant usage on schema public to weavr_app;
+  alter default privileges in schema public
+    grant select, insert, update, delete on tables to weavr_app;
+  alter default privileges in schema public
+    grant usage, select on sequences to weavr_app;
 `);
 await db.exec("set search_path to public, extensions");
 
 const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();
-console.log(`\nApplying ${files.length} migration(s) to Postgres (WASM)\n`);
+console.log(`\nApplying ${files.length} Neon migration(s) to Postgres (WASM)\n`);
 for (const file of files) {
   try {
     await db.exec(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
@@ -141,29 +113,16 @@ for (const file of files) {
   }
 }
 
-// Seed teachers via auth.users trigger + org for self-assignment test
 await db.exec(`
   insert into public.orgs (id, name) values ('${ORG_A}', 'District A');
-  insert into auth.users (id, email) values
-    ('${TEACHER_A}', 'a@example.edu'),
-    ('${TEACHER_B}', 'b@example.edu');
-  update public.teachers set display_name = 'Teacher A' where id = '${TEACHER_A}';
-  update public.teachers set display_name = 'Teacher B' where id = '${TEACHER_B}';
+  insert into public.teachers (id, display_name) values
+    ('${TEACHER_A}', 'Teacher A'),
+    ('${TEACHER_B}', 'Teacher B');
 `);
 
 // ---------------------------------------------------------------------------
 console.log("\n1. Schema & First-Name-Only Invariants\n");
 // ---------------------------------------------------------------------------
-
-await check("on_auth_user_created created teachers rows for A and B", async () => {
-  const rows = await db.query(
-    "select id, display_name from public.teachers where id in ($1, $2) order by display_name",
-    [TEACHER_A, TEACHER_B],
-  );
-  if (rows.rows.length !== 2 || rows.rows[0].display_name !== "Teacher A") {
-    throw new Error(`unexpected teachers rows: ${JSON.stringify(rows.rows)}`);
-  }
-});
 
 await check("all 6 PRD context packs are seeded with generation content", async () => {
   const rows = await db.query(`
@@ -338,7 +297,7 @@ await check("unknown context pack in variation_sets refused; known pack accepted
 });
 
 // ---------------------------------------------------------------------------
-console.log("\n3. Multi-Tenant RLS & Privilege Isolation\n");
+console.log("\n3. Multi-Tenant RLS & Privilege Isolation (weavr_app)\n");
 // ---------------------------------------------------------------------------
 
 await check("every base table in public has RLS enabled", async () => {
@@ -354,24 +313,6 @@ await check("every base table in public has RLS enabled", async () => {
   if (rows.rows.length > 0) {
     throw new Error(`tables without RLS: ${rows.rows.map((r) => r.relname).join(", ")}`);
   }
-});
-
-await check("anon gets permission denied on select * for every base table in public", async () => {
-  const tables = (
-    await db.query(`
-      select c.relname
-      from pg_class c
-      join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relkind = 'r'
-      order by c.relname
-    `)
-  ).rows.map((r) => r.relname);
-
-  await asAnon(db, async () => {
-    for (const tbl of tables) {
-      await refuses(db, `select * from public.${tbl}`, [], "permission denied");
-    }
-  });
 });
 
 await check("teacher A creates class, first-name-only student, calendar, and SEL profile; email first_name refused", async () => {
@@ -412,6 +353,27 @@ await check("teacher A creates class, first-name-only student, calendar, and SEL
       "insert into public.student_action_threads (student_id, kind, messages) values ($1, 'iv', '[]'::jsonb)",
       [STUDENT_A],
     );
+  });
+});
+
+await check("unset app.teacher_id sees 0 rows across every base table in public", async () => {
+  const tables = (
+    await db.query(`
+      select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r'
+      order by c.relname
+    `)
+  ).rows.map((r) => r.relname);
+
+  await asAnonApp(db, async () => {
+    for (const tbl of tables) {
+      const res = await db.query(`select count(*)::int as n from public.${tbl}`);
+      if (res.rows[0].n !== 0) {
+        throw new Error(`unset session saw ${res.rows[0].n} row(s) in public.${tbl}`);
+      }
+    }
   });
 });
 
@@ -552,7 +514,7 @@ await check("anon capability path opens unexpired token, strips unknown keys, an
     );
   });
 
-  await asAnon(db, async () => {
+  await asAnonApp(db, async () => {
     const opened = (await db.query("select public.open_student_path($1) as p", [hash])).rows[0].p;
     if (!opened || opened.variationId !== "var_space") {
       throw new Error(`expected var_space, got ${JSON.stringify(opened)}`);
@@ -660,27 +622,37 @@ await check("same-pack move is a no-op", () =>
   }),
 );
 
-await check("teacher B cannot move or read teacher A memberships; anon cannot execute RPC", async () => {
+await check("teacher B cannot move or read teacher A memberships; unset session refused", async () => {
   await asTeacher(db, TEACHER_B, async () => {
     await refuses(db, "select public.move_student_group($1, 'pack_space', 2)", [STUDENT_A], "not found|privilege");
     const m = (await db.query("select count(*)::int as n from public.group_memberships")).rows[0].n;
     const e = (await db.query("select count(*)::int as n from public.group_membership_events")).rows[0].n;
     if (m !== 0 || e !== 0) throw new Error(`teacher B saw memberships=${m}, events=${e}`);
   });
-  await asAnon(db, () =>
-    refuses(db, "select public.move_student_group($1, 'pack_space', 2)", [STUDENT_A], "permission denied"),
+  await asAnonApp(db, () =>
+    refuses(db, "select public.move_student_group($1, 'pack_space', 2)", [STUDENT_A], "teacher session required"),
   );
 });
 
-await check("group_membership_events cannot be updated or deleted by authenticated teacher", () =>
+await check("group_membership_events cannot be updated or deleted by weavr_app", () =>
   asTeacher(db, TEACHER_A, async () => {
-    await refuses(db, "update public.group_membership_events set to_pack_id = 'pack_space'", [], "permission denied");
-    await refuses(db, "delete from public.group_membership_events", [], "permission denied");
+    const before = (await gmEvents()).length;
+    const updRes = await db.query("update public.group_membership_events set to_pack_id = 'pack_space'");
+    if ((updRes.affectedRows ?? 0) !== 0) {
+      throw new Error(`weavr_app updated ${updRes.affectedRows} group_membership_events row(s)`);
+    }
+    const delRes = await db.query("delete from public.group_membership_events");
+    if ((delRes.affectedRows ?? 0) !== 0) {
+      throw new Error(`weavr_app deleted ${delRes.affectedRows} group_membership_events row(s)`);
+    }
+    if ((await gmEvents()).length !== before) {
+      throw new Error("group_membership_events count changed");
+    }
   }),
 );
 
 // ---------------------------------------------------------------------------
-console.log("\n6. Supabase Advisor Security Equivalents\n");
+console.log("\n6. Postgres / Neon Security Advisor Equivalents & Demo Seed\n");
 // ---------------------------------------------------------------------------
 
 const RPC_ALLOWLIST = new Set([
@@ -690,20 +662,19 @@ const RPC_ALLOWLIST = new Set([
   "save_student_path_session",
 ]);
 
-await check("no unlisted security definer function is callable by anon or authenticated", async () => {
+await check("no unlisted security definer function is executable by weavr_app", async () => {
   const rows = await db.query(`
-    select p.proname, r.rolname
+    select p.proname
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
-    cross join (select unnest(array['anon','authenticated']) as rolname) r
     where n.nspname = 'public'
       and p.prosecdef
-      and has_function_privilege(r.rolname, p.oid, 'execute')
-    order by p.proname, r.rolname
+      and has_function_privilege('weavr_app', p.oid, 'execute')
+    order by p.proname
   `);
   const offenders = rows.rows.filter((r) => !RPC_ALLOWLIST.has(r.proname));
   if (offenders.length > 0) {
-    throw new Error(`unlisted security definer RPCs: ${offenders.map((o) => `${o.proname}(${o.rolname})`).join(", ")}`);
+    throw new Error(`unlisted security definer RPCs: ${offenders.map((o) => o.proname).join(", ")}`);
   }
 });
 
@@ -722,26 +693,6 @@ await check("every function in public pins its search_path", async () => {
   `);
   if (rows.rows.length > 0) {
     throw new Error(`mutable search_path: ${rows.rows.map((r) => r.proname).join(", ")}`);
-  }
-});
-
-await check("no RLS policy trusts user_metadata", async () => {
-  const rows = await db.query(`
-    select polname, tablename
-    from (
-      select pol.polname,
-             c.relname as tablename,
-             coalesce(pg_get_expr(pol.polqual, pol.polrelid), '') ||
-             coalesce(pg_get_expr(pol.polwithcheck, pol.polrelid), '') as body
-      from pg_policy pol
-      join pg_class c on c.oid = pol.polrelid
-      join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public'
-    ) p
-    where body like '%user_metadata%'
-  `);
-  if (rows.rows.length > 0) {
-    throw new Error(`policies reading user_metadata: ${rows.rows.map((r) => `${r.tablename}.${r.polname}`).join(", ")}`);
   }
 });
 
@@ -775,6 +726,11 @@ await check("no view in public bypasses RLS", async () => {
   if (rows.rows.length > 0) {
     throw new Error(`views without security_invoker: ${rows.rows.map((r) => r.relname).join(", ")}`);
   }
+});
+
+await check("db/seed.sql applies cleanly and passes assert_no_student_pii_columns()", async () => {
+  await db.exec(readFileSync(SEED_PATH, "utf8"));
+  await db.query("select public.assert_no_student_pii_columns()");
 });
 
 console.log(`\nSummary: ${passed} passed, ${failures.length} failed\n`);

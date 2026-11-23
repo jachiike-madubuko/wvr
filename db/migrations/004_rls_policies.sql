@@ -1,4 +1,5 @@
--- Row Level Security, deny by default, and schema PII invariant guard.
+-- Row Level Security, deny by default when app.teacher_id is unset,
+-- and schema PII invariant guard.
 
 alter table public.orgs                  enable row level security;
 alter table public.teachers              enable row level security;
@@ -19,30 +20,35 @@ alter table public.student_path_sessions enable row level security;
 -- ---------------------------------------------------------------------------
 
 create policy orgs_select_own on public.orgs
-  for select to authenticated
+  for select to public
   using (
     exists (
       select 1 from public.teachers t
-      where t.id = (select auth.uid()) and t.org_id = public.orgs.id
+      where t.id = (select public.current_teacher_id())
+        and t.org_id = public.orgs.id
     )
   );
 
 -- ---------------------------------------------------------------------------
--- teachers: a teacher sees and edits exactly one row, their own.
+-- teachers: a teacher sees and edits their own row.
 -- ---------------------------------------------------------------------------
 
 create policy teachers_select_own on public.teachers
-  for select to authenticated
-  using (id = (select auth.uid()));
+  for select to public
+  using (id = (select public.current_teacher_id()));
 
 create policy teachers_insert_own on public.teachers
-  for insert to authenticated
-  with check (id = (select auth.uid()));
+  for insert to public
+  with check (id = (select public.current_teacher_id()));
 
 create policy teachers_update_own on public.teachers
-  for update to authenticated
-  using (id = (select auth.uid()))
-  with check (id = (select auth.uid()));
+  for update to public
+  using (id = (select public.current_teacher_id()))
+  with check (id = (select public.current_teacher_id()));
+
+create policy teachers_delete_own on public.teachers
+  for delete to public
+  using (id = (select public.current_teacher_id()));
 
 create or replace function public.reject_org_self_assignment()
 returns trigger
@@ -50,7 +56,7 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if current_user = 'authenticated' and (
+  if nullif(current_setting('app.teacher_id', true), '') is not null and (
     (tg_op = 'INSERT' and new.org_id is not null)
     or (tg_op = 'UPDATE' and new.org_id is distinct from old.org_id)
   ) then
@@ -65,157 +71,153 @@ create trigger teachers_reject_org_self_assignment
   before insert or update of org_id on public.teachers
   for each row execute function public.reject_org_self_assignment();
 
-create policy teachers_delete_own on public.teachers
-  for delete to authenticated
-  using (id = (select auth.uid()));
-
 -- ---------------------------------------------------------------------------
 -- classes & students: scoped to owning teacher.
 -- ---------------------------------------------------------------------------
 
 create policy classes_all_own on public.classes
-  for all to authenticated
-  using (teacher_id = (select auth.uid()))
-  with check (teacher_id = (select auth.uid()));
+  for all to public
+  using (teacher_id = (select public.current_teacher_id()))
+  with check (teacher_id = (select public.current_teacher_id()));
 
 create policy students_all_own on public.students
-  for all to authenticated
+  for all to public
   using (
     exists (
       select 1 from public.classes c
       where c.id = students.class_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   )
   with check (
     exists (
       select 1 from public.classes c
       where c.id = students.class_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   );
 
 -- ---------------------------------------------------------------------------
--- context_packs: read published packs. No write policy, by design.
+-- context_packs: read published packs when teacher session is active.
 -- ---------------------------------------------------------------------------
 
 create policy context_packs_select_published on public.context_packs
-  for select to authenticated
-  using (is_published);
+  for select to public
+  using (is_published and (select public.current_teacher_id()) is not null);
 
 -- ---------------------------------------------------------------------------
 -- pii_scans: insert and read your own. Immutable verdicts.
 -- ---------------------------------------------------------------------------
 
 create policy pii_scans_insert_own on public.pii_scans
-  for insert to authenticated
-  with check (teacher_id = (select auth.uid()));
+  for insert to public
+  with check (teacher_id = (select public.current_teacher_id()));
 
 create policy pii_scans_select_own on public.pii_scans
-  for select to authenticated
-  using (teacher_id = (select auth.uid()));
+  for select to public
+  using (teacher_id = (select public.current_teacher_id()));
 
 -- ---------------------------------------------------------------------------
 -- recipes and variation_sets: full CRUD, scoped to owning teacher.
 -- ---------------------------------------------------------------------------
 
 create policy recipes_select_own on public.recipes
-  for select to authenticated
-  using (teacher_id = (select auth.uid()));
+  for select to public
+  using (teacher_id = (select public.current_teacher_id()));
 
 create policy recipes_insert_own on public.recipes
-  for insert to authenticated
-  with check (teacher_id = (select auth.uid()));
+  for insert to public
+  with check (teacher_id = (select public.current_teacher_id()));
 
 create policy recipes_update_own on public.recipes
-  for update to authenticated
-  using (teacher_id = (select auth.uid()))
-  with check (teacher_id = (select auth.uid()));
+  for update to public
+  using (teacher_id = (select public.current_teacher_id()))
+  with check (teacher_id = (select public.current_teacher_id()));
 
 create policy recipes_delete_own on public.recipes
-  for delete to authenticated
-  using (teacher_id = (select auth.uid()));
+  for delete to public
+  using (teacher_id = (select public.current_teacher_id()));
 
 create policy variation_sets_select_own on public.variation_sets
-  for select to authenticated
-  using (teacher_id = (select auth.uid()));
+  for select to public
+  using (teacher_id = (select public.current_teacher_id()));
 
 create policy variation_sets_insert_own on public.variation_sets
-  for insert to authenticated
+  for insert to public
   with check (
-    teacher_id = (select auth.uid())
+    teacher_id = (select public.current_teacher_id())
     and exists (
       select 1 from public.recipes r
       where r.id = variation_sets.base_recipe_id
-        and r.teacher_id = (select auth.uid())
+        and r.teacher_id = (select public.current_teacher_id())
     )
   );
 
 create policy variation_sets_update_own on public.variation_sets
-  for update to authenticated
-  using (teacher_id = (select auth.uid()))
+  for update to public
+  using (teacher_id = (select public.current_teacher_id()))
   with check (
-    teacher_id = (select auth.uid())
+    teacher_id = (select public.current_teacher_id())
     and exists (
       select 1 from public.recipes r
       where r.id = variation_sets.base_recipe_id
-        and r.teacher_id = (select auth.uid())
+        and r.teacher_id = (select public.current_teacher_id())
     )
   );
 
 create policy variation_sets_delete_own on public.variation_sets
-  for delete to authenticated
-  using (teacher_id = (select auth.uid()));
+  for delete to public
+  using (teacher_id = (select public.current_teacher_id()));
 
 -- ---------------------------------------------------------------------------
 -- calendar_blocks, student_path_tokens, student_path_sessions
 -- ---------------------------------------------------------------------------
 
 create policy calendar_blocks_all_own on public.calendar_blocks
-  for all to authenticated
+  for all to public
   using (
-    teacher_id = (select auth.uid())
+    teacher_id = (select public.current_teacher_id())
     and exists (
       select 1 from public.classes c
       where c.id = calendar_blocks.class_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   )
   with check (
-    teacher_id = (select auth.uid())
+    teacher_id = (select public.current_teacher_id())
     and exists (
       select 1 from public.classes c
       where c.id = calendar_blocks.class_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   );
 
 create policy student_path_tokens_all_own on public.student_path_tokens
-  for all to authenticated
+  for all to public
   using (
     exists (
       select 1 from public.calendar_blocks b
       where b.id = student_path_tokens.calendar_block_id
-        and b.teacher_id = (select auth.uid())
+        and b.teacher_id = (select public.current_teacher_id())
     )
   )
   with check (
     exists (
       select 1 from public.calendar_blocks b
       where b.id = student_path_tokens.calendar_block_id
-        and b.teacher_id = (select auth.uid())
+        and b.teacher_id = (select public.current_teacher_id())
     )
   );
 
 create policy student_path_sessions_select_own on public.student_path_sessions
-  for select to authenticated
+  for select to public
   using (
     exists (
       select 1
       from public.students s
       join public.classes c on c.id = s.class_id
       where s.id = student_path_sessions.student_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   );
 
@@ -224,42 +226,16 @@ create policy student_path_sessions_select_own on public.student_path_sessions
 -- ---------------------------------------------------------------------------
 
 create policy events_insert_own on public.events
-  for insert to authenticated
-  with check (teacher_id = (select auth.uid()));
+  for insert to public
+  with check (teacher_id = (select public.current_teacher_id()));
 
 create policy events_select_own on public.events
-  for select to authenticated
-  using (teacher_id = (select auth.uid()));
+  for select to public
+  using (teacher_id = (select public.current_teacher_id()));
 
 create policy deletion_certificates_select_own on public.deletion_certificates
-  for select to authenticated
-  using (subject_kind = 'teacher' and subject_id = (select auth.uid()));
-
--- ---------------------------------------------------------------------------
--- Table-level grants
--- ---------------------------------------------------------------------------
-
-revoke all on public.orgs                  from anon;
-revoke all on public.teachers              from anon;
-revoke all on public.classes               from anon;
-revoke all on public.students              from anon;
-revoke all on public.context_packs         from anon;
-revoke all on public.pii_scans             from anon;
-revoke all on public.recipes               from anon;
-revoke all on public.variation_sets        from anon;
-revoke all on public.events                from anon;
-revoke all on public.deletion_certificates from anon;
-revoke all on public.calendar_blocks       from anon;
-revoke all on public.student_path_tokens   from anon;
-revoke all on public.student_path_sessions from anon;
-
-revoke insert, update, delete on public.orgs                  from authenticated;
-revoke insert, update, delete on public.context_packs         from authenticated;
-revoke insert, update, delete on public.deletion_certificates from authenticated;
-revoke insert, update, delete on public.student_path_sessions from authenticated;
-revoke update, delete, truncate on public.pii_scans           from authenticated;
-revoke update, delete, truncate on public.events              from authenticated;
-revoke truncate on public.deletion_certificates               from authenticated;
+  for select to public
+  using (subject_kind = 'teacher' and subject_id = (select public.current_teacher_id()));
 
 -- ---------------------------------------------------------------------------
 -- Schema-level student PII invariant check

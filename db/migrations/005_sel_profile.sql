@@ -69,13 +69,13 @@ alter table public.student_sel_checkins enable row level security;
 alter table public.student_action_threads enable row level security;
 
 create policy student_wheel_answers_all_own on public.student_wheel_answers
-  for all to authenticated
+  for all to public
   using (
     exists (
       select 1
       from public.students s
       join public.classes c on c.id = s.class_id
-      where s.id = student_id and c.teacher_id = (select auth.uid())
+      where s.id = student_id and c.teacher_id = (select public.current_teacher_id())
     )
   )
   with check (
@@ -83,18 +83,18 @@ create policy student_wheel_answers_all_own on public.student_wheel_answers
       select 1
       from public.students s
       join public.classes c on c.id = s.class_id
-      where s.id = student_id and c.teacher_id = (select auth.uid())
+      where s.id = student_id and c.teacher_id = (select public.current_teacher_id())
     )
   );
 
 create policy student_sel_checkins_all_own on public.student_sel_checkins
-  for all to authenticated
+  for all to public
   using (
     exists (
       select 1
       from public.students s
       join public.classes c on c.id = s.class_id
-      where s.id = student_id and c.teacher_id = (select auth.uid())
+      where s.id = student_id and c.teacher_id = (select public.current_teacher_id())
     )
   )
   with check (
@@ -102,18 +102,18 @@ create policy student_sel_checkins_all_own on public.student_sel_checkins
       select 1
       from public.students s
       join public.classes c on c.id = s.class_id
-      where s.id = student_id and c.teacher_id = (select auth.uid())
+      where s.id = student_id and c.teacher_id = (select public.current_teacher_id())
     )
   );
 
 create policy student_action_threads_all_own on public.student_action_threads
-  for all to authenticated
+  for all to public
   using (
     exists (
       select 1
       from public.students s
       join public.classes c on c.id = s.class_id
-      where s.id = student_id and c.teacher_id = (select auth.uid())
+      where s.id = student_id and c.teacher_id = (select public.current_teacher_id())
     )
   )
   with check (
@@ -121,13 +121,9 @@ create policy student_action_threads_all_own on public.student_action_threads
       select 1
       from public.students s
       join public.classes c on c.id = s.class_id
-      where s.id = student_id and c.teacher_id = (select auth.uid())
+      where s.id = student_id and c.teacher_id = (select public.current_teacher_id())
     )
   );
-
-revoke all on public.student_wheel_answers from anon;
-revoke all on public.student_sel_checkins from anon;
-revoke all on public.student_action_threads from anon;
 
 comment on table public.student_wheel_answers is
   'Teacher questionnaire options per student. No scores. Same RLS as students.';

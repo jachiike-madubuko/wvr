@@ -3,9 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check:env": "node scripts/check-env.mjs",
     "check:migrations": "node scripts/check-migrations.mjs",
     "test:db": "node scripts/test-migrations.mjs",
-    "verify:db": "npm run check:migrations && npm run test:db"
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:seed": "node scripts/migrate.mjs --seed",
+    "verify:db": "npm run check:env && npm run check:migrations && npm run test:db"
+  },
+  "dependencies": {
+    "pg": "^8.16.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4"

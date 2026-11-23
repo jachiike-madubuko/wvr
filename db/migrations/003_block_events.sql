@@ -125,19 +125,16 @@ create index block_events_student_idx
 alter table public.block_events enable row level security;
 
 create policy block_events_select_own on public.block_events
-  for select to authenticated
+  for select to public
   using (
     exists (
       select 1
       from public.students s
       join public.classes c on c.id = s.class_id
       where s.id = student_id
-        and c.teacher_id = (select auth.uid())
+        and c.teacher_id = (select public.current_teacher_id())
     )
   );
-
-revoke all on public.block_events from anon;
-revoke insert, update, delete on public.block_events from authenticated;
 
 comment on table public.block_events is
   'Per-block attempts and seconds. No names. Not a grade.';
@@ -500,17 +497,10 @@ begin
 end;
 $$;
 
-revoke all on function public.open_student_path(text) from public;
-grant execute on function public.open_student_path(text) to anon, authenticated;
-
-revoke all on function public.open_student_path_roster(text) from public;
-grant execute on function public.open_student_path_roster(text) to anon, authenticated;
-
-revoke all on function public.save_student_path_progress(text, jsonb) from public;
-grant execute on function public.save_student_path_progress(text, jsonb) to anon, authenticated;
-
-revoke all on function public.save_student_path_session(text, uuid, jsonb) from public;
-grant execute on function public.save_student_path_session(text, uuid, jsonb) to anon, authenticated;
+grant execute on function public.open_student_path(text) to public;
+grant execute on function public.open_student_path_roster(text) to public;
+grant execute on function public.save_student_path_progress(text, jsonb) to public;
+grant execute on function public.save_student_path_session(text, uuid, jsonb) to public;
 
 comment on function public.save_student_path_session(text, uuid, jsonb) is
   'Merge per-student dwell and record block events. Student must belong to the token class.';
