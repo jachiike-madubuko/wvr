@@ -1,0 +1,13 @@
+{
+  "name": "weavr",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "test:db": "node scripts/test-migrations.mjs",
+    "verify:db": "npm run check:migrations && npm run test:db"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4"
+  }
+}

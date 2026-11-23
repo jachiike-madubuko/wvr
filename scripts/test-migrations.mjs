@@ -1,0 +1,783 @@
+#!/usr/bin/env node
+/**
+ * Applies every migration in supabase/migrations/ to a real Postgres running in
+ * WASM (PGlite), then asserts tenant isolation, first-name-only constraints,
+ * anonymous capability path security, and optimistic concurrency.
+ */
+
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { PGlite } from "@electric-sql/pglite";
+import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
+
+const SUPABASE_SHIM = `
+create role anon nologin noinherit;
+create role authenticated nologin noinherit;
+create role service_role nologin noinherit bypassrls;
+
+grant usage on schema public to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
+
+create schema auth;
+grant usage on schema auth to anon, authenticated, service_role;
+
+create table auth.users (
+  id uuid primary key,
+  email text
+);
+
+create or replace function auth.uid()
+returns uuid
+language sql
+stable
+as $shim$
+  select nullif(current_setting('test.user_id', true), '')::uuid
+$shim$;
+
+create or replace function auth.jwt()
+returns jsonb
+language sql
+stable
+as $shim$
+  select coalesce(nullif(current_setting('test.jwt_claims', true), ''), '{}')::jsonb
+$shim$;
+`;
+
+const TEACHER_A = "11111111-1111-4111-8111-111111111111";
+const TEACHER_B = "22222222-2222-4222-8222-222222222222";
+const ORG_A = "33333333-3333-4333-8333-333333333333";
+const CLASS_A = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const CLASS_B = "99999999-9999-4999-8999-999999999999";
+const STUDENT_A = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const STUDENT_B = "88888888-8888-4888-8888-888888888888";
+const UNIT_A = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const LESSON_A = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+const SHA_PASS = "a".repeat(64);
+const SHA_BLOCK = "b".repeat(64);
+
+let passed = 0;
+const failures = [];
+
+async function check(name, fn) {
+  try {
+    await fn();
+    passed += 1;
+    console.log(`  ok   ${name}`);
+  } catch (error) {
+    failures.push({ name, message: error.message });
+    console.log(`  FAIL ${name}\n         ${error.message.split("\n")[0]}`);
+  }
+}
+
+async function refuses(db, sql, params, expected) {
+  try {
+    await db.query(sql, params);
+  } catch (error) {
+    if (!new RegExp(expected, "i").test(error.message)) {
+      throw new Error(
+        `refused, but for the wrong reason.\n  wanted /${expected}/\n  got:   ${error.message}`,
+      );
+    }
+    return;
+  }
+  throw new Error(`statement was allowed but should have been refused: ${sql.trim()}`);
+}
+
+async function refusesCode(db, sql, params, code) {
+  try {
+    await db.query(sql, params);
+  } catch (error) {
+    if (error.code !== code) {
+      throw new Error(`wanted SQLSTATE ${code}, got ${error.code}: ${error.message}`);
+    }
+    return;
+  }
+  throw new Error(`statement was allowed but should have been refused: ${sql.trim()}`);
+}
+
+async function asTeacher(db, uid, fn) {
+  await db.exec(`set role authenticated; set test.user_id = '${uid}';`);
+  try {
+    return await fn();
+  } finally {
+    await db.exec("reset role; set test.user_id = '';");
+  }
+}
+
+async function asAnon(db, fn) {
+  await db.exec("set role anon;");
+  try {
+    return await fn();
+  } finally {
+    await db.exec("reset role;");
+  }
+}
+
+const db = new PGlite({ extensions: { pgcrypto } });
+await db.exec(SUPABASE_SHIM);
+await db.exec(`
+  create schema if not exists extensions;
+  create extension if not exists pgcrypto with schema extensions;
+  grant usage on schema extensions to public;
+`);
+await db.exec("set search_path to public, extensions");
+
+const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort();
+console.log(`\nApplying ${files.length} migration(s) to Postgres (WASM)\n`);
+for (const file of files) {
+  try {
+    await db.exec(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
+    console.log(`  ok   ${file}`);
+  } catch (error) {
+    console.error(`  FAIL ${file}\n\n${error.message}\n`);
+    process.exit(1);
+  }
+}
+
+// Seed teachers via auth.users trigger + org for self-assignment test
+await db.exec(`
+  insert into public.orgs (id, name) values ('${ORG_A}', 'District A');
+  insert into auth.users (id, email) values
+    ('${TEACHER_A}', 'a@example.edu'),
+    ('${TEACHER_B}', 'b@example.edu');
+  update public.teachers set display_name = 'Teacher A' where id = '${TEACHER_A}';
+  update public.teachers set display_name = 'Teacher B' where id = '${TEACHER_B}';
+`);
+
+// ---------------------------------------------------------------------------
+console.log("\n1. Schema & First-Name-Only Invariants\n");
+// ---------------------------------------------------------------------------
+
+await check("on_auth_user_created created teachers rows for A and B", async () => {
+  const rows = await db.query(
+    "select id, display_name from public.teachers where id in ($1, $2) order by display_name",
+    [TEACHER_A, TEACHER_B],
+  );
+  if (rows.rows.length !== 2 || rows.rows[0].display_name !== "Teacher A") {
+    throw new Error(`unexpected teachers rows: ${JSON.stringify(rows.rows)}`);
+  }
+});
+
+await check("all 6 PRD context packs are seeded with generation content", async () => {
+  const rows = await db.query(`
+    select id,
+           jsonb_array_length(body -> 'quantities') as quantities,
+           jsonb_array_length(body -> 'rate_pairs') as rate_pairs
+    from public.context_packs
+    where is_published
+    order by id
+  `);
+  if (rows.rows.length !== 6) {
+    throw new Error(`expected 6 published packs, found ${rows.rows.length}`);
+  }
+  for (const p of rows.rows) {
+    if (p.quantities < 3 || p.rate_pairs < 2) {
+      throw new Error(`pack ${p.id} underspecified: ${JSON.stringify(p)}`);
+    }
+  }
+});
+
+await check("empty context pack body is refused", () =>
+  refuses(
+    db,
+    "insert into public.context_packs (id, label, body) values ('pack_empty_probe', 'Empty', '{}'::jsonb)",
+    [],
+    "context_packs_body_has_generation_content",
+  ),
+);
+
+await check("assert_no_student_pii_columns passes on real schema", async () => {
+  await db.query("select public.assert_no_student_pii_columns()");
+});
+
+await check("assert_no_student_pii_columns catches disallowed PII column", async () => {
+  await db.exec("create table public.tmp_bad (id int, student_email text, last_name text);");
+  try {
+    await refuses(
+      db,
+      "select public.assert_no_student_pii_columns()",
+      [],
+      "disallowed student PII columns",
+    );
+  } finally {
+    await db.exec("drop table public.tmp_bad;");
+  }
+});
+
+await check("first_name is refused on non-student tables", async () => {
+  await db.exec("alter table public.recipes add column first_name text;");
+  try {
+    await refuses(
+      db,
+      "select public.assert_no_student_pii_columns()",
+      [],
+      "given-name columns are only allowed on public.students",
+    );
+  } finally {
+    await db.exec("alter table public.recipes drop column first_name;");
+  }
+});
+
+// ---------------------------------------------------------------------------
+console.log("\n2. PII Gate & Append-Only Ledgers\n");
+// ---------------------------------------------------------------------------
+
+let passScanId;
+let blockScanId;
+let recipeAId;
+
+await check("recipe with passing scan succeeds; blocked, foreign, or null scan refused", async () => {
+  await asTeacher(db, TEACHER_A, async () => {
+    passScanId = (
+      await db.query(
+        `insert into public.pii_scans (teacher_id, verdict, rule_id, scanned_text_sha256, scanner_version)
+         values ($1, 'pass', null, $2, 'pii.v1') returning id`,
+        [TEACHER_A, SHA_PASS],
+      )
+    ).rows[0].id;
+    blockScanId = (
+      await db.query(
+        `insert into public.pii_scans (teacher_id, verdict, rule_id, scanned_text_sha256, scanner_version)
+         values ($1, 'block', 'rule.email', $2, 'pii.v1') returning id`,
+        [TEACHER_A, SHA_BLOCK],
+      )
+    ).rows[0].id;
+
+    recipeAId = (
+      await db.query(
+        `insert into public.recipes (teacher_id, pii_scan_id, locked)
+         values ($1, $2, '{"title":"Fractions"}'::jsonb) returning id`,
+        [TEACHER_A, passScanId],
+      )
+    ).rows[0].id;
+
+    await refuses(
+      db,
+      `insert into public.recipes (teacher_id, pii_scan_id, locked)
+       values ($1, $2, '{"title":"Bad"}'::jsonb)`,
+      [TEACHER_A, blockScanId],
+      "verdict block",
+    );
+
+    await refuses(
+      db,
+      `insert into public.recipes (teacher_id, pii_scan_id, locked)
+       values ($1, null, '{"title":"NoScan"}'::jsonb)`,
+      [TEACHER_A],
+      'verdict missing|null value in column "pii_scan_id"',
+    );
+  });
+
+  await asTeacher(db, TEACHER_B, () =>
+    refuses(
+      db,
+      `insert into public.recipes (teacher_id, pii_scan_id, locked)
+       values ($1, $2, '{"title":"Stolen"}'::jsonb)`,
+      [TEACHER_B, passScanId],
+      "belongs to a different teacher",
+    ),
+  );
+});
+
+await check("pii_scans update refused as superuser; delete refused while referenced", async () => {
+  await refuses(
+    db,
+    "update public.pii_scans set verdict = 'pass', rule_id = null where id = $1",
+    [blockScanId],
+    "append-only",
+  );
+  await refuses(
+    db,
+    "delete from public.pii_scans where id = $1",
+    [passScanId],
+    "violates foreign key constraint",
+  );
+});
+
+await check("events and deletion_certificates are append-only even as superuser", async () => {
+  await db.query(
+    "insert into public.events (teacher_id, name, payload) values ($1, 'recipe.created', '{}'::jsonb)",
+    [TEACHER_A],
+  );
+  await refuses(db, "update public.events set name = 'x.y'", [], "append-only");
+  await refuses(db, "delete from public.events", [], "append-only");
+  await refuses(db, "truncate public.events", [], "append-only");
+
+  await db.query(
+    `insert into public.deletion_certificates (subject_kind, subject_id, requested_at, rows_deleted)
+     values ('teacher', $1, now(), '{"recipes":1}'::jsonb)`,
+    [TEACHER_A],
+  );
+  await refuses(db, "update public.deletion_certificates set subject_kind = 'org'", [], "append-only");
+  await refuses(db, "delete from public.deletion_certificates", [], "append-only");
+  await refuses(db, "truncate public.deletion_certificates", [], "append-only");
+});
+
+await check("unknown context pack in variation_sets refused; known pack accepted", async () => {
+  await asTeacher(db, TEACHER_A, async () => {
+    await refuses(
+      db,
+      `insert into public.variation_sets (teacher_id, base_recipe_id, pack_ids, payload)
+       values ($1, $2, array['pack_nonexistent'], '{}'::jsonb)`,
+      [TEACHER_A, recipeAId],
+      "unknown or unpublished context pack",
+    );
+    await db.query(
+      `insert into public.variation_sets (teacher_id, base_recipe_id, pack_ids, payload)
+       values ($1, $2, array['pack_space', 'pack_cooking'], '{"ok":true}'::jsonb)`,
+      [TEACHER_A, recipeAId],
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+console.log("\n3. Multi-Tenant RLS & Privilege Isolation\n");
+// ---------------------------------------------------------------------------
+
+await check("every base table in public has RLS enabled", async () => {
+  const rows = await db.query(`
+    select c.relname
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relkind = 'r'
+      and not c.relrowsecurity
+    order by c.relname
+  `);
+  if (rows.rows.length > 0) {
+    throw new Error(`tables without RLS: ${rows.rows.map((r) => r.relname).join(", ")}`);
+  }
+});
+
+await check("anon gets permission denied on select * for every base table in public", async () => {
+  const tables = (
+    await db.query(`
+      select c.relname
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r'
+      order by c.relname
+    `)
+  ).rows.map((r) => r.relname);
+
+  await asAnon(db, async () => {
+    for (const tbl of tables) {
+      await refuses(db, `select * from public.${tbl}`, [], "permission denied");
+    }
+  });
+});
+
+await check("teacher A creates class, first-name-only student, calendar, and SEL profile; email first_name refused", async () => {
+  await asTeacher(db, TEACHER_A, async () => {
+    await db.query(
+      "insert into public.classes (id, teacher_id, name, grade, nav_layout) values ($1, $2, 'Room 204', 2, 'top')",
+      [CLASS_A, TEACHER_A],
+    );
+    await refuses(
+      db,
+      "insert into public.students (class_id, first_name) values ($1, 'kid@school.edu')",
+      [CLASS_A],
+      "violates check constraint",
+    );
+    await db.query(
+      "insert into public.students (id, class_id, first_name, sort_key) values ($1, $2, 'Maya', 0)",
+      [STUDENT_A, CLASS_A],
+    );
+    await db.query(
+      `insert into public.calendar_blocks (id, class_id, teacher_id, start_date, end_date, subjects, kind, title)
+       values ($1, $2, $3, '2026-09-01', '2026-09-05', array['math'], 'unit', 'Fractions')`,
+      [UNIT_A, CLASS_A, TEACHER_A],
+    );
+    await db.query(
+      `insert into public.calendar_blocks (id, class_id, teacher_id, start_date, end_date, subjects, kind, title, unit_id)
+       values ($1, $2, $3, '2026-09-01', '2026-09-01', array['math'], 'lesson', 'Halves', $4)`,
+      [LESSON_A, CLASS_A, TEACHER_A, UNIT_A],
+    );
+    await db.query(
+      "insert into public.student_wheel_answers (student_id, item_id, option_id) values ($1, 'hard', 'keeps')",
+      [STUDENT_A],
+    );
+    await db.query(
+      "insert into public.student_sel_checkins (student_id, period, mood, level) values ($1, 'am', 'calm', 4)",
+      [STUDENT_A],
+    );
+    await db.query(
+      "insert into public.student_action_threads (student_id, kind, messages) values ($1, 'iv', '[]'::jsonb)",
+      [STUDENT_A],
+    );
+  });
+});
+
+await check("teacher B sees 0 rows across all tenant tables and cannot mutate teacher A data", async () => {
+  await db.exec(`
+    insert into public.classes (id, teacher_id, name, grade) values ('${CLASS_B}', '${TEACHER_B}', 'Room B', 3);
+    insert into public.students (id, class_id, first_name, sort_key) values ('${STUDENT_B}', '${CLASS_B}', 'Bo', 0);
+  `);
+
+  await asTeacher(db, TEACHER_B, async () => {
+    const tenantQueries = [
+      ["classes", `select id from public.classes where id = '${CLASS_A}'`],
+      ["students", `select id from public.students where id = '${STUDENT_A}'`],
+      ["recipes", "select id from public.recipes"],
+      ["variation_sets", "select id from public.variation_sets"],
+      ["calendar_blocks", "select id from public.calendar_blocks"],
+      ["student_path_tokens", "select id from public.student_path_tokens"],
+      ["student_path_sessions", "select id from public.student_path_sessions"],
+      ["block_events", "select id from public.block_events"],
+      ["student_wheel_answers", "select id from public.student_wheel_answers"],
+      ["student_sel_checkins", "select id from public.student_sel_checkins"],
+      ["student_action_threads", "select id from public.student_action_threads"],
+    ];
+    for (const [label, q] of tenantQueries) {
+      const res = await db.query(q);
+      if (res.rows.length !== 0) {
+        throw new Error(`teacher B saw ${res.rows.length} row(s) in ${label}`);
+      }
+    }
+
+    await refuses(
+      db,
+      "insert into public.students (class_id, first_name) values ($1, 'Intruder')",
+      [CLASS_A],
+      "row-level security",
+    );
+    await refuses(
+      db,
+      `insert into public.variation_sets (teacher_id, base_recipe_id, pack_ids, payload)
+       values ($1, $2, array['pack_space'], '{}'::jsonb)`,
+      [TEACHER_B, recipeAId],
+      "row-level security",
+    );
+    await refuses(
+      db,
+      `insert into public.calendar_blocks (class_id, teacher_id, start_date, end_date, subjects, kind, title)
+       values ($1, $2, '2026-09-01', '2026-09-01', array['math'], 'lesson', 'Hijack')`,
+      [CLASS_A, TEACHER_B],
+      "row-level security|must belong to teacher_id",
+    );
+    await refuses(
+      db,
+      "insert into public.student_wheel_answers (student_id, item_id, option_id) values ($1, 'partner', 'solo')",
+      [STUDENT_A],
+      "row-level security",
+    );
+    await refuses(
+      db,
+      "insert into public.student_sel_checkins (student_id, period, mood, level) values ($1, 'pm', 'tired', 2)",
+      [STUDENT_A],
+      "row-level security",
+    );
+    await refuses(
+      db,
+      "insert into public.student_action_threads (student_id, kind, messages) values ($1, 'sel', '[]'::jsonb)",
+      [STUDENT_A],
+      "row-level security",
+    );
+  });
+});
+
+await check("teacher cannot self-assign org_id on insert or update", () =>
+  asTeacher(db, TEACHER_A, async () => {
+    await refuses(
+      db,
+      "update public.teachers set org_id = $1 where id = $2",
+      [ORG_A, TEACHER_A],
+      "org membership is assigned out of band",
+    );
+    const NEW_T = "44444444-4444-4444-8444-444444444444";
+    await refuses(
+      db,
+      "insert into public.teachers (id, org_id) values ($1, $2)",
+      [NEW_T, ORG_A],
+      "org membership is assigned out of band|row-level security",
+    );
+  }),
+);
+
+await check("calendar hierarchy prevents unit parent, self parent, and cross-class nesting", () =>
+  asTeacher(db, TEACHER_A, async () => {
+    await refuses(
+      db,
+      `insert into public.calendar_blocks (class_id, teacher_id, start_date, end_date, subjects, kind, unit_id)
+       values ($1, $2, '2026-09-01', '2026-09-02', array['math'], 'unit', $3)`,
+      [CLASS_A, TEACHER_A, UNIT_A],
+      "calendar_blocks_unit_kind_no_parent",
+    );
+    await refuses(
+      db,
+      "update public.calendar_blocks set unit_id = id where id = $1",
+      [LESSON_A],
+      "calendar_blocks_no_self_parent|unit_id must reference a unit",
+    );
+  }),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n4. Anonymous Capability Paths & Telemetry (/s/[token])\n");
+// ---------------------------------------------------------------------------
+
+await check("malformed token_hash is refused", () =>
+  asTeacher(db, TEACHER_A, () =>
+    refuses(
+      db,
+      `insert into public.student_path_tokens (token_hash, calendar_block_id, variation_id, payload, expires_at)
+       values ('not-a-sha256', $1, 'v1', '{}'::jsonb, now() + interval '1 day')`,
+      [LESSON_A],
+      "violates check constraint",
+    ),
+  ),
+);
+
+await check("anon capability path opens unexpired token, strips unknown keys, and caps blockMs", async () => {
+  const hash = (await db.query("select encode(digest('tok-live', 'sha256'), 'hex') as h")).rows[0].h;
+  const expiredHash = (await db.query("select encode(digest('tok-expired', 'sha256'), 'hex') as h")).rows[0].h;
+
+  await asTeacher(db, TEACHER_A, async () => {
+    await db.query(
+      `insert into public.student_path_tokens (token_hash, calendar_block_id, variation_id, payload, expires_at)
+       values ($1, $2, 'var_space', '{"blocks":[{"id":"hook"}]}'::jsonb, now() + interval '2 days')`,
+      [hash, LESSON_A],
+    );
+    await db.query(
+      `insert into public.student_path_tokens (token_hash, calendar_block_id, variation_id, payload, expires_at)
+       values ($1, $2, 'var_old', '{"blocks":[]}'::jsonb, now() - interval '1 minute')`,
+      [expiredHash, LESSON_A],
+    );
+  });
+
+  await asAnon(db, async () => {
+    const opened = (await db.query("select public.open_student_path($1) as p", [hash])).rows[0].p;
+    if (!opened || opened.variationId !== "var_space") {
+      throw new Error(`expected var_space, got ${JSON.stringify(opened)}`);
+    }
+    const expired = (await db.query("select public.open_student_path($1) as p", [expiredHash])).rows[0].p;
+    if (expired !== null) {
+      throw new Error(`expired token must return null, got ${JSON.stringify(expired)}`);
+    }
+
+    const roster = (await db.query("select public.open_student_path_roster($1) as r", [hash])).rows[0].r;
+    if (!Array.isArray(roster) || roster.length !== 1 || roster[0].firstName !== "Maya" || Object.keys(roster[0]).length !== 2) {
+      throw new Error(`unexpected roster shape: ${JSON.stringify(roster)}`);
+    }
+
+    await db.query("select public.save_student_path_progress($1, $2::jsonb)", [
+      hash,
+      JSON.stringify({ completedBlockIds: ["hook"], blockMs: { hook: 99_999_999 }, evil: true }),
+    ]);
+    const saved = (
+      await db.query("select public.save_student_path_progress($1, $2::jsonb) as p", [
+        hash,
+        JSON.stringify({ completedBlockIds: ["hook"], blockMs: { hook: 500 } }),
+      ])
+    ).rows[0].p;
+
+    if (saved.evil !== undefined || saved.blockMs?.hook !== 14_400_500) {
+      throw new Error(`unexpected progress merge: ${JSON.stringify(saved)}`);
+    }
+
+    await db.query("select public.save_student_path_session($1, $2, $3::jsonb)", [
+      hash,
+      STUDENT_A,
+      JSON.stringify({
+        completedBlockIds: ["hook"],
+        blockMs: { hook: 1000 },
+        blockEvents: [
+          { blockId: "hook", subject: "hook", attempts: 1, durationSec: 120, errorLog: [] },
+          { blockId: "math_1", subject: "math", attempts: 4, durationSec: 210, errorLog: ["wrong numerator"] },
+        ],
+      }),
+    ]);
+
+    await refuses(
+      db,
+      "select public.save_student_path_session($1, $2, $3::jsonb)",
+      [hash, STUDENT_B, JSON.stringify({ completedBlockIds: [], blockMs: { hook: 1 } })],
+      "student not on this class",
+    );
+  });
+
+  const events = await asTeacher(db, TEACHER_A, () =>
+    db.query("select block_id, status, attempts, duration_sec from public.block_events where student_id = $1 order by block_id", [STUDENT_A]),
+  );
+  const byId = Object.fromEntries(events.rows.map((r) => [r.block_id, r]));
+  if (byId.hook?.status !== "completed" || byId.math_1?.status !== "struggling") {
+    throw new Error(`unexpected block_events: ${JSON.stringify(events.rows)}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+console.log("\n5. Optimistic Concurrency (move_student_group)\n");
+// ---------------------------------------------------------------------------
+
+const gmMove = (pack, version) =>
+  db.query("select public.move_student_group($1, $2, $3) as v", [STUDENT_A, pack, version]);
+const gmEvents = async () =>
+  (await db.query("select * from public.group_membership_events where student_id = $1 order by created_at, id", [STUDENT_A])).rows;
+
+await check("first move inserts row at version 1", () =>
+  asTeacher(db, TEACHER_A, async () => {
+    const v = (await gmMove("pack_space", 0)).rows[0].v;
+    if (v !== 1) throw new Error(`expected 1, got ${v}`);
+    const ev = await gmEvents();
+    if (ev.length !== 1 || ev[0].from_pack_id !== null || ev[0].to_pack_id !== "pack_space") {
+      throw new Error(`bad first event: ${JSON.stringify(ev)}`);
+    }
+  }),
+);
+
+await check("second move bumps version to 2 and logs from/to", () =>
+  asTeacher(db, TEACHER_A, async () => {
+    const v = (await gmMove("pack_cooking", 1)).rows[0].v;
+    if (v !== 2) throw new Error(`expected 2, got ${v}`);
+    const ev = await gmEvents();
+    const last = ev[ev.length - 1];
+    if (ev.length !== 2 || last.from_pack_id !== "pack_space" || last.to_pack_id !== "pack_cooking") {
+      throw new Error(`bad second event: ${JSON.stringify(last)}`);
+    }
+  }),
+);
+
+await check("stale version raises VERSION_CONFLICT (SQLSTATE 40001)", () =>
+  asTeacher(db, TEACHER_A, async () => {
+    await refusesCode(db, "select public.move_student_group($1, 'pack_space', 1)", [STUDENT_A], "40001");
+    await refusesCode(db, "select public.move_student_group($1, 'pack_space', 0)", [STUDENT_A], "40001");
+  }),
+);
+
+await check("same-pack move is a no-op", () =>
+  asTeacher(db, TEACHER_A, async () => {
+    const before = (await gmEvents()).length;
+    const v = (await gmMove("pack_cooking", 2)).rows[0].v;
+    if (v !== 2) throw new Error(`expected 2, got ${v}`);
+    if ((await gmEvents()).length !== before) throw new Error("same-pack move wrote an event");
+  }),
+);
+
+await check("teacher B cannot move or read teacher A memberships; anon cannot execute RPC", async () => {
+  await asTeacher(db, TEACHER_B, async () => {
+    await refuses(db, "select public.move_student_group($1, 'pack_space', 2)", [STUDENT_A], "not found|privilege");
+    const m = (await db.query("select count(*)::int as n from public.group_memberships")).rows[0].n;
+    const e = (await db.query("select count(*)::int as n from public.group_membership_events")).rows[0].n;
+    if (m !== 0 || e !== 0) throw new Error(`teacher B saw memberships=${m}, events=${e}`);
+  });
+  await asAnon(db, () =>
+    refuses(db, "select public.move_student_group($1, 'pack_space', 2)", [STUDENT_A], "permission denied"),
+  );
+});
+
+await check("group_membership_events cannot be updated or deleted by authenticated teacher", () =>
+  asTeacher(db, TEACHER_A, async () => {
+    await refuses(db, "update public.group_membership_events set to_pack_id = 'pack_space'", [], "permission denied");
+    await refuses(db, "delete from public.group_membership_events", [], "permission denied");
+  }),
+);
+
+// ---------------------------------------------------------------------------
+console.log("\n6. Supabase Advisor Security Equivalents\n");
+// ---------------------------------------------------------------------------
+
+const RPC_ALLOWLIST = new Set([
+  "open_student_path",
+  "open_student_path_roster",
+  "save_student_path_progress",
+  "save_student_path_session",
+]);
+
+await check("no unlisted security definer function is callable by anon or authenticated", async () => {
+  const rows = await db.query(`
+    select p.proname, r.rolname
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    cross join (select unnest(array['anon','authenticated']) as rolname) r
+    where n.nspname = 'public'
+      and p.prosecdef
+      and has_function_privilege(r.rolname, p.oid, 'execute')
+    order by p.proname, r.rolname
+  `);
+  const offenders = rows.rows.filter((r) => !RPC_ALLOWLIST.has(r.proname));
+  if (offenders.length > 0) {
+    throw new Error(`unlisted security definer RPCs: ${offenders.map((o) => `${o.proname}(${o.rolname})`).join(", ")}`);
+  }
+});
+
+await check("every function in public pins its search_path", async () => {
+  const rows = await db.query(`
+    select p.proname
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.prokind = 'f'
+      and not exists (
+        select 1 from unnest(coalesce(p.proconfig, '{}')) c
+        where c like 'search_path=%'
+      )
+    order by p.proname
+  `);
+  if (rows.rows.length > 0) {
+    throw new Error(`mutable search_path: ${rows.rows.map((r) => r.proname).join(", ")}`);
+  }
+});
+
+await check("no RLS policy trusts user_metadata", async () => {
+  const rows = await db.query(`
+    select polname, tablename
+    from (
+      select pol.polname,
+             c.relname as tablename,
+             coalesce(pg_get_expr(pol.polqual, pol.polrelid), '') ||
+             coalesce(pg_get_expr(pol.polwithcheck, pol.polrelid), '') as body
+      from pg_policy pol
+      join pg_class c on c.oid = pol.polrelid
+      join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public'
+    ) p
+    where body like '%user_metadata%'
+  `);
+  if (rows.rows.length > 0) {
+    throw new Error(`policies reading user_metadata: ${rows.rows.map((r) => `${r.tablename}.${r.polname}`).join(", ")}`);
+  }
+});
+
+await check("every RLS-enabled table with an UPDATE policy also has a SELECT policy", async () => {
+  const rows = await db.query(`
+    select c.relname
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
+      and exists (select 1 from pg_policy p where p.polrelid = c.oid and p.polcmd in ('w', '*'))
+      and not exists (select 1 from pg_policy p where p.polrelid = c.oid and p.polcmd in ('r', '*'))
+    order by c.relname
+  `);
+  if (rows.rows.length > 0) {
+    throw new Error(`UPDATE without SELECT policy: ${rows.rows.map((r) => r.relname).join(", ")}`);
+  }
+});
+
+await check("no view in public bypasses RLS", async () => {
+  const rows = await db.query(`
+    select c.relname
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'v'
+      and coalesce(
+        (select option_value from pg_options_to_table(c.reloptions) where option_name = 'security_invoker'),
+        'false'
+      ) <> 'true'
+    order by c.relname
+  `);
+  if (rows.rows.length > 0) {
+    throw new Error(`views without security_invoker: ${rows.rows.map((r) => r.relname).join(", ")}`);
+  }
+});
+
+console.log(`\nSummary: ${passed} passed, ${failures.length} failed\n`);
+if (failures.length > 0) {
+  process.exit(1);
+}
