@@ -126,14 +126,10 @@ function PackCluster({
       ref={setNodeRef}
       data-galaxy-cell={pack.id}
       data-drag-over={isTarget ? "true" : undefined}
-      className="relative flex min-h-[210px] flex-col items-center justify-between rounded-[24px] p-5 backdrop-blur-md transition-colors"
+      className="relative flex min-h-[210px] flex-col items-center justify-between rounded-[24px] p-5 transition-colors"
       style={{
-        background: isTarget
-          ? "rgba(74, 222, 128, 0.08)"
-          : "rgba(14, 20, 36, 0.72)",
-        border: isTarget
-          ? "2px dashed #4ade80"
-          : "1px solid rgba(255, 255, 255, 0.12)",
+        background: isTarget ? "rgba(74, 222, 128, 0.08)" : "transparent",
+        border: isTarget ? "2px dashed #4ade80" : "2px solid transparent",
       }}
     >
       <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-1.5">
@@ -146,9 +142,6 @@ function PackCluster({
           style={{ fontFamily: "var(--font-serif-display)" }}
         >
           {pack.label}
-        </span>
-        <span className="text-xs text-[#8892b0]">
-          {members.length} {members.length === 1 ? "kid" : "kids"}
         </span>
       </div>
 
@@ -256,12 +249,6 @@ export function GalaxyHome({
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#58b6fa]">
             Interest Galaxy
           </p>
-          <h1
-            className="text-2xl font-bold text-[#f6f1ea]"
-            style={{ fontFamily: "var(--font-serif-display)" }}
-          >
-            Room Clusters
-          </h1>
         </div>
       </div>
 
