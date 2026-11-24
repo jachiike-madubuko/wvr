@@ -3,3 +3,7 @@ node_modules/
 .env.local
 .next/
 .neon
+test-results/
+playwright-report/
+.playwright-cli/
+tsconfig.tsbuildinfo
