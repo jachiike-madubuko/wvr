@@ -31,6 +31,39 @@ export function RoomStage({ initialRoom }: { initialRoom: RoomSnapshot }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const refreshRoom = async () => {
+      try {
+        const res = await fetch("/api/room", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const fresh = (await res.json()) as RoomSnapshot;
+        if (!cancelled) {
+          setRoom(fresh);
+        }
+      } catch {
+        // Ignore transient background refresh failures.
+      }
+    };
+
+    const onFocus = () => {
+      void refreshRoom();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshRoom();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
   const handleMoveStudent = async (
     studentId: string,
     toPackId: string,

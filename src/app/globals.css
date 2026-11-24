@@ -25,6 +25,13 @@
   /* Typography */
   --font-serif-display: Georgia, "Newsreader", serif;
 
+  /* Orbiting Galaxy & Student Avatars */
+  --surface-card: #121c33;
+  --ink: #eef3fd;
+  --ink-soft: #b5c0d6;
+  --galaxy-blink: 5.5s;
+  --galaxy-bob: 6s;
+
   /* Bklit Chart Tokens */
   --chart-background: #131826;
   --chart-foreground: #f6f1ea;
@@ -136,5 +143,211 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .wv-flip-card {
     transition: none;
+  }
+}
+
+/* Orbiting Galaxy & Student Avatars */
+.wv-orbit-cell {
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.wv-orbit-cell > * {
+  grid-area: 1 / 1;
+}
+
+.wv-orbit-nodes {
+  position: relative;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.wv-orbit-node {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--orbit-r)) rotate(calc(-1 * var(--a)));
+  animation: wv-revolve 48s linear infinite;
+}
+
+.wv-orbit-cell:hover .wv-orbit-node,
+.wv-orbit-cell:focus-within .wv-orbit-node,
+.wv-orbit-cell[data-paused="true"] .wv-orbit-node {
+  animation-play-state: paused;
+}
+
+@keyframes wv-revolve {
+  from {
+    transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--orbit-r)) rotate(calc(-1 * var(--a)));
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(calc(var(--a) + 360deg)) translateX(var(--orbit-r)) rotate(calc(-1 * (var(--a) + 360deg)));
+  }
+}
+
+@keyframes wv-float {
+  0%, 100% {
+    transform: translateY(-3px);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes wv-blink {
+  0%, 88%, 100% {
+    transform: scaleY(1);
+  }
+  92% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes wv-pet-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2.5px);
+  }
+}
+
+.wv-node-bob {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.wv-node-halo {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  border: 4px solid var(--signal-blue);
+  background: rgb(255 253 248 / 0.9);
+  box-shadow:
+    inset 0 0 0 2px var(--surface-card),
+    0 8px 18px -9px rgb(26 20 16 / 0.5);
+  overflow: visible;
+}
+
+.wv-node-face {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  overflow: visible;
+}
+
+.wv-node-avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.wv-node-eye {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.wv-node-pet {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: wv-pet-float 3.4s ease-in-out infinite;
+}
+
+.wv-node-visor {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 30% 22%,
+    rgb(255 255 255 / 0.55) 0%,
+    rgb(255 255 255 / 0.12) 34%,
+    transparent 58%
+  );
+}
+
+.wv-node-base {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: -4px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--surface-card);
+  border: 1px solid rgb(255 255 255 / 0.16);
+}
+
+.wv-node-badge {
+  position: absolute;
+  bottom: -6px;
+  right: -3px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--surface-card);
+  border: 1px solid rgb(255 255 255 / 0.22);
+  box-shadow: 0 0 0 2px var(--surface-card);
+  color: #fff;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.wv-node-name {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgb(18 28 51 / 0.9);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.wv-node-pace {
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-card);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wv-node-pace[data-pace="slow"] {
+  color: var(--signal-coral);
+}
+
+.wv-node-pace[data-pace="fast"] {
+  color: var(--signal-mint);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wv-node-bob {
+    animation: wv-float var(--galaxy-bob) ease-in-out infinite;
+  }
+  .wv-node-eye {
+    animation: wv-blink var(--galaxy-blink) infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wv-orbit-node,
+  .wv-node-bob,
+  .wv-node-eye,
+  .wv-node-pet {
+    animation: none;
   }
 }

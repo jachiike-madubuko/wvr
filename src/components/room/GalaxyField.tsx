@@ -7,11 +7,6 @@ const GalaxyBackground = dynamic(() => import("./GalaxyBackground"), {
   ssr: false,
 });
 
-const GalaxyGsapLoop = dynamic(
-  () => import("./GalaxyGsapLoop").then((m) => m.GalaxyGsapLoop),
-  { ssr: false },
-);
-
 const STAR_COLORS = ["#fff6e0", "#ffd27a", "#ffb35c"];
 
 export function GalaxyField({
@@ -52,7 +47,6 @@ export function GalaxyField({
           repulsionStrength={0.4}
         />
       </div>
-      {fieldRef && <GalaxyGsapLoop fieldRef={fieldRef} />}
       <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">
         {children}
       </div>

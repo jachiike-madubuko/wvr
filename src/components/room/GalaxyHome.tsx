@@ -13,12 +13,20 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { StudentAvatarHalo } from "@/components/avatars/StudentAvatar";
+import { nodeLook } from "@/lib/avatars/look";
+import type { EquippedLoadout } from "@/lib/collectibles/catalog";
 import type { RoomPack, RoomStudent } from "@/lib/room/types";
 import { GalaxyField } from "./GalaxyField";
 
 export const OPEN_DELAY_MS = 500;
 export const CLOSE_DELAY_MS = 100;
+
+// Must match the wv-revolve duration in globals.css.
+const REVOLVE_MS = 48_000;
+
+type StudentWithEquipped = RoomStudent & { equipped?: EquippedLoadout };
 
 interface PopoverState {
   student: RoomStudent;
@@ -26,80 +34,104 @@ interface PopoverState {
   y: number;
 }
 
-function StudentAvatar({
-  student,
-  packColor,
-}: {
-  student: RoomStudent;
-  packColor: string;
-}) {
-  return (
-    <>
-      <span
-        className="flex h-11 w-11 items-center justify-center rounded-full transition-transform group-hover:scale-110"
-        style={{ border: `3px solid ${packColor}` }}
-      >
-        <span className="flex h-8 w-8 flex-col items-center justify-center rounded-full border-2 border-black/25 bg-[#d4a373]">
-          <span className="mb-0.5 flex gap-2">
-            <span className="h-1 w-1 rounded-full bg-[#2b1d0c]" />
-            <span className="h-1 w-1 rounded-full bg-[#2b1d0c]" />
-          </span>
-          <span className="h-0.5 w-1.5 rounded-sm bg-[#2b1d0c]" />
-        </span>
-      </span>
-      <span className="text-[11px] font-semibold text-slate-200">
-        {student.firstName}
-      </span>
-      {student.paceBand === "ahead" && (
-        <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#48e29a]">
-          FAST
-        </span>
-      )}
-      {student.paceBand === "behind" && (
-        <span className="text-[9px] font-extrabold uppercase tracking-wider text-[#f87171]">
-          SLOW
-        </span>
-      )}
-    </>
-  );
+function revolveAnimation(el: Element): Animation | undefined {
+  return el
+    .getAnimations?.()
+    .find((a) => (a as CSSAnimation).animationName === "wv-revolve");
 }
 
 function DraggableStudentNode({
   student,
+  index,
+  count,
   packColor,
   onHoverStart,
   onHoverEnd,
 }: {
-  student: RoomStudent;
+  student: StudentWithEquipped;
+  index: number;
+  count: number;
   packColor: string;
   onHoverStart: (student: RoomStudent, el: HTMLElement) => void;
   onHoverEnd: () => void;
 }) {
+  const orbitRef = useRef<HTMLDivElement>(null);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: student.id,
     data: { packId: student.packId, version: student.version },
   });
 
+  const look = nodeLook(student.id);
+  const blinkDelay = `${(index % 7) * 0.41}s`;
+
+  // A node that mounts late copies a sibling's animation time (or the page clock when
+  // alone), so the group keeps even spacing instead of stacking on angle zero.
+  useLayoutEffect(() => {
+    const el = orbitRef.current;
+    if (!el) return;
+    const sibling = Array.from(el.parentElement?.children ?? []).find(
+      (n) => n !== el,
+    );
+    const theirs = sibling && revolveAnimation(sibling);
+    const mine = revolveAnimation(el);
+    if (mine && theirs && theirs.currentTime !== null) {
+      mine.currentTime = theirs.currentTime;
+    } else {
+      el.style.animationDelay = `${-(performance.now() % REVOLVE_MS)}ms`;
+    }
+  }, []);
+
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      className="wv-student-node group flex cursor-grab flex-col items-center gap-1 touch-none active:cursor-grabbing"
-      data-student-id={student.id}
-      data-pack-id={student.packId}
-      data-dragging={isDragging ? "true" : undefined}
-      style={{ opacity: isDragging ? 0.35 : 1 }}
-      onMouseEnter={(e) => onHoverStart(student, e.currentTarget)}
-      onMouseLeave={onHoverEnd}
+      ref={orbitRef}
+      className="wv-orbit-node"
+      style={{ "--a": `${(360 * index) / count}deg` } as CSSProperties}
     >
-      <Link
-        href={`/students/${student.id}`}
-        aria-label={`Open ${student.firstName}'s profile`}
-        className="flex flex-col items-center gap-1"
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        className="wv-student-node group flex cursor-grab flex-col items-center touch-none active:cursor-grabbing"
+        data-student-id={student.id}
+        data-pack-id={student.packId}
+        data-dragging={isDragging ? "true" : undefined}
+        style={{ opacity: isDragging ? 0.35 : 1 }}
+        onMouseEnter={(e) => onHoverStart(student, e.currentTarget)}
+        onMouseLeave={onHoverEnd}
       >
-        <StudentAvatar student={student} packColor={packColor} />
-      </Link>
+        <Link
+          href={`/students/${student.id}`}
+          aria-label={`Open ${student.firstName}'s profile`}
+          className="flex flex-col items-center"
+        >
+          <div
+            className="wv-node-bob"
+            style={{
+              animationDuration: `${5.4 + (index % 4) * 0.4}s`,
+              animationDelay: `${(index % 6) * 0.35}s`,
+            }}
+          >
+            <StudentAvatarHalo
+              seed={student.id}
+              look={look}
+              equipped={student.equipped ?? {}}
+              ringColor={packColor}
+              blinkDelay={blinkDelay}
+            />
+            <span className="wv-node-name">{student.firstName}</span>
+            {student.paceBand === "ahead" && (
+              <span className="wv-node-pace" data-pace="fast">
+                Fast
+              </span>
+            )}
+            {student.paceBand === "behind" && (
+              <span className="wv-node-pace" data-pace="slow">
+                Slow
+              </span>
+            )}
+          </div>
+        </Link>
+      </div>
     </div>
   );
 }
@@ -108,31 +140,38 @@ function PackCluster({
   pack,
   members,
   activeStudent,
+  isPaused,
   onHoverStart,
   onHoverEnd,
 }: {
   pack: RoomPack;
-  members: RoomStudent[];
-  activeStudent: RoomStudent | null;
+  members: StudentWithEquipped[];
+  activeStudent: StudentWithEquipped | null;
+  isPaused: boolean;
   onHoverStart: (student: RoomStudent, el: HTMLElement) => void;
   onHoverEnd: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: pack.id });
   const isTarget =
     activeStudent !== null && isOver && activeStudent.packId !== pack.id;
+  const orbitRadius = Math.min(104, Math.max(70, 24 * members.length));
 
   return (
     <section
       ref={setNodeRef}
       data-galaxy-cell={pack.id}
       data-drag-over={isTarget ? "true" : undefined}
-      className="relative flex h-full w-full flex-col items-center justify-center gap-5 rounded-[24px] p-4 transition-colors"
-      style={{
-        background: isTarget ? "rgba(74, 222, 128, 0.08)" : "transparent",
-        border: isTarget ? "2px dashed #4ade80" : "2px solid transparent",
-      }}
+      data-paused={isPaused ? "true" : undefined}
+      className="wv-orbit-cell h-full w-full rounded-[24px] p-4 transition-colors"
+      style={
+        {
+          "--orbit-r": `${orbitRadius}px`,
+          background: isTarget ? "rgba(74, 222, 128, 0.08)" : "transparent",
+          border: isTarget ? "2px dashed #4ade80" : "2px solid transparent",
+        } as CSSProperties
+      }
     >
-      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-1.5">
+      <div className="z-[1] flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-1.5">
         <span
           className="inline-block h-2.5 w-2.5 rounded-full"
           style={{ backgroundColor: pack.color }}
@@ -145,11 +184,13 @@ function PackCluster({
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-4">
-        {members.map((student) => (
+      <div className="wv-orbit-nodes">
+        {members.map((student, index) => (
           <DraggableStudentNode
             key={student.id}
             student={student}
+            index={index}
+            count={members.length}
             packColor={pack.color}
             onHoverStart={onHoverStart}
             onHoverEnd={onHoverEnd}
@@ -265,6 +306,9 @@ export function GalaxyHome({
               pack={pack}
               members={students.filter((s) => s.packId === pack.id)}
               activeStudent={activeStudent}
+              isPaused={
+                popover?.student.packId === pack.id || activeStudentId !== null
+              }
               onHoverStart={scheduleOpen}
               onHoverEnd={scheduleClose}
             />
@@ -273,8 +317,15 @@ export function GalaxyHome({
 
         <DragOverlay>
           {activeStudent ? (
-            <div className="flex flex-col items-center gap-1 opacity-95">
-              <StudentAvatar student={activeStudent} packColor={activePackColor} />
+            <div className="flex flex-col items-center gap-1.5 opacity-95">
+              <StudentAvatarHalo
+                seed={activeStudent.id}
+                equipped={
+                  (activeStudent as StudentWithEquipped).equipped ?? {}
+                }
+                ringColor={activePackColor}
+              />
+              <span className="wv-node-name">{activeStudent.firstName}</span>
             </div>
           ) : null}
         </DragOverlay>
