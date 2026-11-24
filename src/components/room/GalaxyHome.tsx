@@ -262,9 +262,6 @@ export function GalaxyHome({
           >
             Room Clusters
           </h1>
-          <p className="text-xs text-[#8892b0]">
-            Hover 500ms for lesson status · Drag a student to regroup
-          </p>
         </div>
       </div>
 
