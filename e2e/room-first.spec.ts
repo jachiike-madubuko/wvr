@@ -25,6 +25,17 @@ test("renders Galaxy Home, flips to Pace Calendar with G/C shortcuts, and toggle
     await expect(page.locator(`[data-student-id]`, { hasText: name })).toBeVisible();
   }
 
+  // Upgraded SVG avatars, orbiting nodes, and seeded equipped collectibles
+  expect(await page.locator(".wv-orbit-node").count()).toBeGreaterThanOrEqual(6);
+  expect(
+    await page.locator("[data-student-id] svg.wv-node-avatar").count(),
+  ).toBeGreaterThanOrEqual(6);
+  await expect(
+    page.locator(
+      '[data-student-id="dddddddd-dddd-4ddd-8ddd-dddddddddd02"] [data-equipped-item="cooking_chef_toque"]',
+    ),
+  ).toBeVisible();
+
   const scene = page.getByTestId("room-flip-scene");
   await expect(scene).toHaveAttribute("data-face", "galaxy");
 

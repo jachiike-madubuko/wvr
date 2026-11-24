@@ -87,3 +87,90 @@ test("walks first-name roster picker and sequential mosaic deck with DrawPad and
   await expect(page.getByTestId("deck-progress")).toContainText("3 of 3 done");
   expect(pageErrors).toEqual([]);
 });
+
+test("unlocks collectibles, equips hat/eyewear/pet, persists across reload, and syncs to Galaxy", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (err) => pageErrors.push(err.message));
+
+  await page.goto("/s/demo-space-lesson", { waitUntil: "domcontentloaded" });
+  await page.locator('[data-student-pick="Maya"]').click();
+
+  await expect(page.getByTestId("student-deck-avatar")).toBeVisible();
+  await page.getByTestId("student-tab-inventory").click();
+
+  await expect(page.getByTestId("collectible-grid")).toBeVisible();
+  await expect(page.getByTestId("collectible-inspector")).toBeVisible();
+
+  // Idempotently unlock all 6 Space items via the demo milestone bar
+  const triggerBtn = page.getByTestId("trigger-next-milestone");
+  for (let i = 0; i < 6; i++) {
+    if (await triggerBtn.isDisabled()) break;
+    const unlockRes = page.waitForResponse(
+      (r) =>
+        r.url().includes("/api/student-path/") &&
+        r.url().includes("/collectibles") &&
+        r.request().method() === "POST",
+    );
+    await triggerBtn.click();
+    expect((await unlockRes).status()).toBe(200);
+    await expect(page.getByTestId("unlock-toast")).toBeVisible();
+  }
+  await expect(triggerBtn).toBeDisabled();
+
+  // Equip hat, eyewear, and pet
+  const targetItems = [
+    "space_cadet_cap",
+    "space_star_visor",
+    "space_comet_ufo",
+  ] as const;
+
+  for (const itemId of targetItems) {
+    const card = page.locator(`[data-collectible-id="${itemId}"]`);
+    await card.click();
+    const alreadyEquipped = await card.getAttribute("data-equipped");
+    if (alreadyEquipped !== "true") {
+      const equipRes = page.waitForResponse(
+        (r) =>
+          r.url().includes("/api/student-path/") &&
+          r.url().includes("/collectibles") &&
+          r.request().method() === "POST",
+      );
+      await page.getByTestId("collectible-equip-btn").click();
+      expect((await equipRes).status()).toBe(200);
+    }
+    await expect(card).toHaveAttribute("data-equipped", "true");
+    await expect(
+      page
+        .getByTestId("student-deck-avatar")
+        .locator(`[data-equipped-item="${itemId}"]`),
+    ).toBeVisible();
+  }
+
+  // Reload and verify persistence on /s/[token]
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator('[data-student-pick="Maya"]').click();
+  for (const itemId of targetItems) {
+    await expect(
+      page
+        .getByTestId("student-deck-avatar")
+        .locator(`[data-equipped-item="${itemId}"]`),
+    ).toBeVisible();
+  }
+
+  // Verify equipped items sync to Maya's node on / (Galaxy Home)
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const mayaNode = page.locator(
+    '[data-student-id="dddddddd-dddd-4ddd-8ddd-dddddddddd01"]',
+  );
+  await expect(mayaNode).toBeVisible();
+  for (const itemId of targetItems) {
+    await expect(
+      mayaNode.locator(`[data-equipped-item="${itemId}"]`),
+    ).toBeVisible();
+  }
+
+  expect(pageErrors).toEqual([]);
+});

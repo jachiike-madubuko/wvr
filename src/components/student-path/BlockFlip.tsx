@@ -1,7 +1,18 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { CollectibleIcon } from "@/components/avatars/CollectibleSvg";
+import { StudentAvatarHalo } from "@/components/avatars/StudentAvatar";
+import { nodeLook } from "@/lib/avatars/look";
 import { FACE } from "@/lib/blocks/library";
+import {
+  type CollectibleItem,
+  RARITY_META,
+  type StudentCollectibleRecord,
+  evaluateMilestonesForPack,
+  loadoutFromCollectibles,
+} from "@/lib/collectibles/catalog";
+import { PACK_COLORS } from "@/lib/room/types";
 import {
   buildMosaicDeck,
   isBlockUnlocked,
@@ -13,6 +24,7 @@ import type {
   StudentRosterItem,
 } from "@/lib/student-path/data";
 import { BreakTimer } from "./BreakTimer";
+import { CollectibleInventory } from "./CollectibleInventory";
 import { DrawPad } from "./DrawPad";
 
 export function BlockFlip({
@@ -20,7 +32,7 @@ export function BlockFlip({
   payload,
   initialCompletedIds,
   roster,
-  initialCollectiblesByStudent: _initialCollectiblesByStudent,
+  initialCollectiblesByStudent,
 }: {
   token: string;
   payload: RawPathPayload;
@@ -30,8 +42,14 @@ export function BlockFlip({
 }) {
   const deck = useMemo(() => buildMosaicDeck(payload), [payload]);
   const [student, setStudent] = useState<StudentRosterItem | null>(null);
+  const [activeTab, setActiveTab] = useState<"blocks" | "inventory">("blocks");
   const [completedIds, setCompletedIds] = useState<string[]>(initialCompletedIds);
   const [activeBlock, setActiveBlock] = useState<MosaicBlock | null>(null);
+  const [collectiblesByStudent, setCollectiblesByStudent] = useState<
+    Record<string, StudentCollectiblesBundle>
+  >(() => initialCollectiblesByStudent ?? {});
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [unlockToast, setUnlockToast] = useState<CollectibleItem | null>(null);
 
   // Modal interaction state
   const openedAtRef = useRef<number>(0);
@@ -59,6 +77,51 @@ export function BlockFlip({
     if (activeBlock.kind === "pbl.social") return timerReady;
     return true;
   })();
+
+  const mutateCollectible = async (
+    studentId: string,
+    action: "unlock" | "equip" | "unequip",
+    item: CollectibleItem,
+    recallNote?: string,
+  ): Promise<boolean> => {
+    setBusyItemId(item.id);
+    try {
+      const res = await fetch(
+        `/api/student-path/${encodeURIComponent(token)}/collectibles`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studentId,
+            action,
+            itemId: item.id,
+            ...(recallNote ? { recallNote } : {}),
+          }),
+        },
+      );
+      if (!res.ok) return false;
+      const data = (await res.json()) as {
+        ok: boolean;
+        items: StudentCollectibleRecord[];
+      };
+      if (data.ok && Array.isArray(data.items)) {
+        setCollectiblesByStudent((prev) => ({
+          ...prev,
+          [studentId]: {
+            packId: prev[studentId]?.packId ?? "pack_space",
+            items: data.items,
+          },
+        }));
+        if (action === "unlock") {
+          setUnlockToast(item);
+        }
+        return true;
+      }
+      return false;
+    } finally {
+      setBusyItemId(null);
+    }
+  };
 
   const handleComplete = async () => {
     if (!activeBlock || !student || !canComplete || saving) return;
@@ -96,6 +159,26 @@ export function BlockFlip({
       if (res.ok) {
         setCompletedIds(nextCompleted);
         setActiveBlock(null);
+
+        const bundle = collectiblesByStudent[student.id] ?? {
+          packId: "pack_space",
+          items: [],
+        };
+        const newlyUnlocked = evaluateMilestonesForPack({
+          packId: bundle.packId,
+          completedBlockCount: nextCompleted.length,
+          totalBlocks: deck.length,
+          adaptiveCredits: 0,
+          unlockedItemIds: bundle.items.map((r) => r.itemId),
+        });
+        for (const item of newlyUnlocked) {
+          await mutateCollectible(
+            student.id,
+            "unlock",
+            item,
+            item.defaultRecallNote,
+          );
+        }
       }
     } finally {
       setSaving(false);
@@ -124,52 +207,202 @@ export function BlockFlip({
         </div>
 
         <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
-          {roster.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              data-student-pick={item.firstName}
-              onClick={() => setStudent(item)}
-              className="rounded-2xl border border-white/15 bg-[#12151f] px-4 py-5 text-lg font-bold text-[#f6f1ea] transition-transform hover:-translate-y-0.5 hover:border-[#58b6fa]"
-            >
-              {item.firstName}
-            </button>
-          ))}
+          {roster.map((item) => {
+            const bundle = collectiblesByStudent[item.id] ?? {
+              packId: "pack_space",
+              items: [],
+            };
+            const equipped = loadoutFromCollectibles(bundle.items);
+            const ringColor = PACK_COLORS[bundle.packId] ?? "#38bdf8";
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                data-student-pick={item.firstName}
+                onClick={() => {
+                  setStudent(item);
+                  setActiveTab("blocks");
+                  setUnlockToast(null);
+                }}
+                className="flex flex-col items-center gap-2.5 rounded-2xl border border-white/15 bg-[#12151f] px-4 py-5 text-lg font-bold text-[#f6f1ea] transition-transform hover:-translate-y-0.5 hover:border-[#58b6fa]"
+              >
+                <StudentAvatarHalo
+                  seed={item.id}
+                  look={nodeLook(item.id)}
+                  equipped={equipped}
+                  ringColor={ringColor}
+                  size="sm"
+                />
+                <span>{item.firstName}</span>
+              </button>
+            );
+          })}
         </div>
       </main>
     );
   }
 
   const doneCount = deck.filter((b) => completedIds.includes(b.id)).length;
+  const studentBundle = collectiblesByStudent[student.id] ?? {
+    packId: "pack_space",
+    items: [],
+  };
+  const studentLoadout = loadoutFromCollectibles(studentBundle.items);
+  const studentRingColor = PACK_COLORS[studentBundle.packId] ?? "#38bdf8";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-5 px-4 py-8 text-[#f6f1ea]">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#58b6fa]">
-            {payload.packLabel ?? "Space"} · {student.firstName}
-          </p>
-          <h1
-            className="mt-1 text-2xl font-bold"
-            style={{ fontFamily: "var(--font-serif-display)" }}
-          >
-            {payload.title ?? "Station Luna"}
-          </h1>
-          <p data-testid="deck-progress" className="mt-1 text-xs text-[#8892b0]">
-            {doneCount} of {deck.length} done
-          </p>
+        <div className="flex items-center gap-3.5">
+          <div data-testid="student-deck-avatar" className="shrink-0">
+            <StudentAvatarHalo
+              seed={student.id}
+              look={nodeLook(student.id)}
+              equipped={studentLoadout}
+              ringColor={studentRingColor}
+              size="md"
+            />
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#58b6fa]">
+              {payload.packLabel ?? "Space"} · {student.firstName}
+            </p>
+            <h1
+              className="mt-1 text-2xl font-bold"
+              style={{ fontFamily: "var(--font-serif-display)" }}
+            >
+              {payload.title ?? "Station Luna"}
+            </h1>
+            <p data-testid="deck-progress" className="mt-1 text-xs text-[#8892b0]">
+              {doneCount} of {deck.length} done
+            </p>
+          </div>
         </div>
 
         <button
           type="button"
-          onClick={() => setStudent(null)}
+          onClick={() => {
+            setStudent(null);
+            setUnlockToast(null);
+          }}
           className="rounded-full border border-white/15 px-3.5 py-1.5 text-xs font-semibold text-[#cbd5e1] hover:bg-white/10"
         >
           Switch
         </button>
       </header>
 
-      <div className="grid grid-cols-2 gap-4" data-testid="mosaic-grid">
+      {/* Blocks / Inventory Tabs */}
+      <nav
+        aria-label="Student views"
+        className="flex items-center gap-2 border-b border-white/10 pb-2"
+      >
+        <button
+          type="button"
+          data-testid="student-tab-blocks"
+          onClick={() => setActiveTab("blocks")}
+          className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${
+            activeTab === "blocks"
+              ? "bg-[#58b6fa] text-[#08121e]"
+              : "bg-[#121622] text-[#cbd5e1] hover:text-white"
+          }`}
+        >
+          Blocks
+        </button>
+        <button
+          type="button"
+          data-testid="student-tab-inventory"
+          onClick={() => setActiveTab("inventory")}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-colors ${
+            activeTab === "inventory"
+              ? "bg-[#58b6fa] text-[#08121e]"
+              : "bg-[#121622] text-[#cbd5e1] hover:text-white"
+          }`}
+        >
+          <span>Inventory</span>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${
+              activeTab === "inventory"
+                ? "bg-[#08121e]/15 text-[#08121e]"
+                : "bg-white/10 text-[#cbd5e1]"
+            }`}
+          >
+            {studentBundle.items.length}
+          </span>
+        </button>
+      </nav>
+
+      {unlockToast && (
+        <div
+          data-testid="unlock-toast"
+          role="status"
+          style={{
+            borderColor: RARITY_META[unlockToast.rarity].border,
+            backgroundColor: RARITY_META[unlockToast.rarity].bg,
+          }}
+          className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3"
+        >
+          <div className="flex items-center gap-3">
+            <CollectibleIcon itemId={unlockToast.id} className="h-9 w-9 shrink-0" />
+            <div>
+              <p
+                style={{ color: RARITY_META[unlockToast.rarity].color }}
+                className="text-[10px] font-extrabold uppercase tracking-[0.14em]"
+              >
+                New {unlockToast.rarity} Collectible Unlocked!
+              </p>
+              <p className="text-sm font-bold text-[#f6f1ea]">
+                {unlockToast.name}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {activeTab !== "inventory" && (
+              <button
+                type="button"
+                onClick={() => setActiveTab("inventory")}
+                className="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/25"
+              >
+                Equip
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Dismiss unlock notice"
+              onClick={() => setUnlockToast(null)}
+              className="rounded-lg px-2 py-1 text-xs text-[#cbd5e1] hover:bg-white/10"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "inventory" ? (
+        <CollectibleInventory
+          studentId={student.id}
+          firstName={student.firstName}
+          packId={studentBundle.packId}
+          records={studentBundle.items}
+          busyItemId={busyItemId}
+          onEquipToggle={async (item, currentlyEquipped) => {
+            await mutateCollectible(
+              student.id,
+              currentlyEquipped ? "unequip" : "equip",
+              item,
+            );
+          }}
+          onUnlockItem={async (item) => {
+            await mutateCollectible(
+              student.id,
+              "unlock",
+              item,
+              item.defaultRecallNote,
+            );
+          }}
+        />
+      ) : (
+        <div className="grid grid-cols-2 gap-4" data-testid="mosaic-grid">
         {deck.map((block, index) => {
           const unlocked = isBlockUnlocked(index, completedIds, deck);
           const done = completedIds.includes(block.id);
@@ -232,7 +465,8 @@ export function BlockFlip({
             </button>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {activeBlock && (
         <div

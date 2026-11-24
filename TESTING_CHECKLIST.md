@@ -51,6 +51,11 @@ Start the local server (`npx next dev -p 3000`, already running if launched) and
   - Completing **Launch Fuel Cells** (`Start`) saves progress via `save_student_path_session` and unlocks **Split the Moon** (`Try`).
   - Drawing on **DrawPad** (`Undo` / `Clear` work) and saving unlocks **Half Orbit Check** (`Check`).
   - Picking an answer choice saves silently without scoring/shaming the child and reaches `3 of 3 done`.
+- [ ] **Student Avatar & Collectible Inventory (Phase 1 & Phase 2):**
+  - Roster picker tiles and persistent deck header display `StudentAvatarHalo` with equipped gear.
+  - Completing blocks auto-unlocks Space milestone collectibles (`unlock-toast`).
+  - Switching to the **Inventory** tab shows the Live Avatar Loadout, 3 equipped slots (`hat`, `eyewear`, `pet`), Theme & Rarity filters, Collection Grid, Item Inspector with memory recall note, and Demo Milestone Trigger Bar (`trigger-next-milestone`).
+  - Equipping `space_cadet_cap`, `space_star_visor`, and `space_comet_ufo` persists across reload on `/s/demo-space-lesson` and renders immediately on Maya's orbiting node on `/` (Galaxy Home) and `/students/dddddddd-dddd-4ddd-8ddd-dddddddddd01`.
 
 ---
 
