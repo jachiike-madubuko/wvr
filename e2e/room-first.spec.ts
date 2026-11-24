@@ -63,7 +63,7 @@ test("enforces strict 500ms hover delay before showing student popover", async (
   const popover = page.getByTestId("student-popover");
 
   // Hover < 500ms: popover must NOT appear
-  await mayaNode.hover();
+  await mayaNode.hover({ force: true });
   await page.waitForTimeout(200);
   await expect(popover).toHaveCount(0);
 
@@ -73,7 +73,7 @@ test("enforces strict 500ms hover delay before showing student popover", async (
   await expect(popover).toHaveCount(0);
 
   // Hover >= 500ms: popover appears with profile link
-  await mayaNode.hover();
+  await mayaNode.hover({ force: true });
   await page.waitForTimeout(600);
   await expect(popover).toBeVisible();
   await expect(popover).toContainText("Maya");
@@ -104,11 +104,27 @@ test("drags student to another cluster, persists across reload, and returns 409 
     const leoNode = page.locator(`[data-student-id="${leoId}"]`);
     const targetCell = page.locator(`[data-galaxy-cell="${targetPack}"]`);
 
+    const leoBox = await leoNode.boundingBox();
+    const targetBox = await targetCell.boundingBox();
+    expect(leoBox).not.toBeNull();
+    expect(targetBox).not.toBeNull();
+
     const movePromise = page.waitForResponse(
       (res) => res.url().includes("/api/room/move") && res.request().method() === "POST",
     );
 
-    await leoNode.dragTo(targetCell);
+    await page.mouse.move(
+      leoBox!.x + leoBox!.width / 2,
+      leoBox!.y + leoBox!.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      targetBox!.x + targetBox!.width / 2,
+      targetBox!.y + targetBox!.height / 2,
+      { steps: 12 },
+    );
+    await expect(targetCell).toHaveAttribute("data-drag-over", "true");
+    await page.mouse.up();
     const moveRes = await movePromise;
     expect(moveRes.status()).toBe(200);
 

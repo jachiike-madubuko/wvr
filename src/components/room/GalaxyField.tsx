@@ -1,6 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import type { ReactNode, RefObject } from "react";
+
+const GalaxyGsapLoop = dynamic(
+  () => import("./GalaxyGsapLoop").then((m) => m.GalaxyGsapLoop),
+  { ssr: false },
+);
 
 export function GalaxyField({
   fieldRef,
@@ -17,6 +23,7 @@ export function GalaxyField({
       {/* Background slot: pure CSS starfield/nebula until custom GalaxyBackground is provided */}
       <div className="wv-stars" aria-hidden="true" />
       <div className="wv-nebula" aria-hidden="true" />
+      {fieldRef && <GalaxyGsapLoop fieldRef={fieldRef} />}
       <div className="relative z-10 mx-auto max-w-6xl">{children}</div>
     </div>
   );
