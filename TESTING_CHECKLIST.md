@@ -21,7 +21,7 @@ Start the local server (`npx next dev -p 3000`, already running if launched) and
     ```
 - [ ] **3D Perspective Flip (`G` / `C`):** Pressing `C` or clicking **Calendar C** flips 180° to Pace Calendar; pressing `G` or clicking **Galaxy G** flips back.
 - [ ] **WavyStackBar & Swimlane Table:** Week/Month toggle renders `WavyStackBar` (`Ahead` mint, `On pace` blue, `Behind` coral); **Swimlane Table** sorts by urgency and filters by **Behind / On Track / Ahead** and **Overall / Math / ELA**.
-- [ ] **WebGL2 Galaxy Background:** Warm gold/amber starfield (`GalaxyBackground.tsx`) animates behind clusters with `clickWarp` on click (`prefers-reduced-motion` and CSS `.wv-stars` fallback supported).
+- [ ] **WebGL2 Galaxy Background:** Warm gold/amber starfield (`GalaxyBackground.tsx`) animates steadily behind clusters (`clickWarp={false}`, `intro={false}`, `prefers-reduced-motion` and CSS `.wv-stars` fallback supported).
 
 ---
 

@@ -40,7 +40,8 @@ export function GalaxyField({
           flareIntensity={1}
           starSpeed={0.25}
           mouseRepulsion={false}
-          clickWarp
+          clickWarp={false}
+          intro={false}
           starColors={STAR_COLORS}
           twinkleIntensity={0.4}
           speed={0.1}
