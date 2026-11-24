@@ -39,7 +39,8 @@ export async function POST(
       itemId: item.id,
       slot: item.slot,
       milestoneId: item.milestoneId,
-      recallNote: parsed.data.recallNote ?? item.defaultRecallNote,
+      // Always persist the catalog default server-side; never store untrusted client free-text.
+      recallNote: item.defaultRecallNote,
     });
 
     if (!items) {

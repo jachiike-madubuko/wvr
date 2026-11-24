@@ -14,6 +14,7 @@ import {
 } from "@dnd-kit/core";
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { StudentAvatarHalo } from "@/components/avatars/StudentAvatar";
 import { nodeLook } from "@/lib/avatars/look";
 import type { EquippedLoadout } from "@/lib/collectibles/catalog";
@@ -47,6 +48,7 @@ function DraggableStudentNode({
   packColor,
   onHoverStart,
   onHoverEnd,
+  onPointerDown,
 }: {
   student: StudentWithEquipped;
   index: number;
@@ -54,6 +56,7 @@ function DraggableStudentNode({
   packColor: string;
   onHoverStart: (student: RoomStudent, el: HTMLElement) => void;
   onHoverEnd: () => void;
+  onPointerDown: (student: RoomStudent) => void;
 }) {
   const orbitRef = useRef<HTMLDivElement>(null);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -98,10 +101,13 @@ function DraggableStudentNode({
         style={{ opacity: isDragging ? 0.35 : 1 }}
         onMouseEnter={(e) => onHoverStart(student, e.currentTarget)}
         onMouseLeave={onHoverEnd}
+        onPointerDownCapture={() => onPointerDown(student)}
       >
         <Link
           href={`/students/${student.id}`}
           aria-label={`Open ${student.firstName}'s profile`}
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
           className="flex flex-col items-center"
         >
           <div
@@ -143,6 +149,7 @@ function PackCluster({
   isPaused,
   onHoverStart,
   onHoverEnd,
+  onPointerDown,
 }: {
   pack: RoomPack;
   members: StudentWithEquipped[];
@@ -150,6 +157,7 @@ function PackCluster({
   isPaused: boolean;
   onHoverStart: (student: RoomStudent, el: HTMLElement) => void;
   onHoverEnd: () => void;
+  onPointerDown: (student: RoomStudent) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: pack.id });
   const isTarget =
@@ -194,6 +202,7 @@ function PackCluster({
             packColor={pack.color}
             onHoverStart={onHoverStart}
             onHoverEnd={onHoverEnd}
+            onPointerDown={onPointerDown}
           />
         ))}
       </div>
@@ -204,10 +213,12 @@ function PackCluster({
 export function GalaxyHome({
   packs,
   students,
+  paused = false,
   onMoveStudent,
 }: {
   packs: RoomPack[];
   students: RoomStudent[];
+  paused?: boolean;
   onMoveStudent: (studentId: string, toPackId: string, expectedVersion: number) => void;
 }) {
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -216,6 +227,23 @@ export function GalaxyHome({
 
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
+  const [pointerDownPackId, setPointerDownPackId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!pointerDownPackId) return;
+    const clearPointerDown = () => setPointerDownPackId(null);
+    window.addEventListener("pointerup", clearPointerDown);
+    window.addEventListener("pointercancel", clearPointerDown);
+    return () => {
+      window.removeEventListener("pointerup", clearPointerDown);
+      window.removeEventListener("pointercancel", clearPointerDown);
+    };
+  }, [pointerDownPackId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -275,6 +303,7 @@ export function GalaxyHome({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveStudentId(null);
+    setPointerDownPackId(null);
     if (!over) return;
     const stu = students.find((s) => s.id === String(active.id));
     const toPackId = String(over.id);
@@ -283,8 +312,30 @@ export function GalaxyHome({
     }
   };
 
+  const handleDragCancel = () => {
+    setActiveStudentId(null);
+    setPointerDownPackId(null);
+  };
+
+  const dragOverlayContent = (
+    <DragOverlay>
+      {activeStudent ? (
+        <div className="flex flex-col items-center gap-1.5 opacity-95">
+          <StudentAvatarHalo
+            seed={activeStudent.id}
+            equipped={
+              (activeStudent as StudentWithEquipped).equipped ?? {}
+            }
+            ringColor={activePackColor}
+          />
+          <span className="wv-node-name">{activeStudent.firstName}</span>
+        </div>
+      ) : null}
+    </DragOverlay>
+  );
+
   return (
-    <GalaxyField fieldRef={fieldRef}>
+    <GalaxyField fieldRef={fieldRef} paused={paused}>
       <div className="mb-2 flex shrink-0 items-end justify-between">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#58b6fa]">
@@ -297,7 +348,7 @@ export function GalaxyHome({
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveStudentId(null)}
+        onDragCancel={handleDragCancel}
       >
         <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-3 sm:gap-4 lg:grid-cols-3">
           {packs.map((pack) => (
@@ -307,28 +358,18 @@ export function GalaxyHome({
               members={students.filter((s) => s.packId === pack.id)}
               activeStudent={activeStudent}
               isPaused={
-                popover?.student.packId === pack.id || activeStudentId !== null
+                popover?.student.packId === pack.id ||
+                activeStudentId !== null ||
+                pointerDownPackId === pack.id
               }
               onHoverStart={scheduleOpen}
               onHoverEnd={scheduleClose}
+              onPointerDown={(student) => setPointerDownPackId(student.packId)}
             />
           ))}
         </div>
 
-        <DragOverlay>
-          {activeStudent ? (
-            <div className="flex flex-col items-center gap-1.5 opacity-95">
-              <StudentAvatarHalo
-                seed={activeStudent.id}
-                equipped={
-                  (activeStudent as StudentWithEquipped).equipped ?? {}
-                }
-                ringColor={activePackColor}
-              />
-              <span className="wv-node-name">{activeStudent.firstName}</span>
-            </div>
-          ) : null}
-        </DragOverlay>
+        {mounted ? createPortal(dragOverlayContent, document.body) : null}
       </DndContext>
 
       {popover && (

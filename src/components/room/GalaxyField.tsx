@@ -11,9 +11,11 @@ const STAR_COLORS = ["#fff6e0", "#ffd27a", "#ffb35c"];
 
 export function GalaxyField({
   fieldRef,
+  paused = false,
   children,
 }: {
   fieldRef?: RefObject<HTMLDivElement | null>;
+  paused?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -45,6 +47,7 @@ export function GalaxyField({
           direction="backward"
           mouseInteraction={false}
           repulsionStrength={0.4}
+          disableAnimation={paused}
         />
       </div>
       <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">

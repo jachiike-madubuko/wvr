@@ -33,7 +33,14 @@ export function RoomStage({ initialRoom }: { initialRoom: RoomSnapshot }) {
 
   useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
+    let lastRefreshAt = 0;
+
     const refreshRoom = async () => {
+      const now = Date.now();
+      if (inFlight || now - lastRefreshAt < 250) return;
+      inFlight = true;
+      lastRefreshAt = now;
       try {
         const res = await fetch("/api/room", { cache: "no-store" });
         if (!res.ok || cancelled) return;
@@ -43,6 +50,8 @@ export function RoomStage({ initialRoom }: { initialRoom: RoomSnapshot }) {
         }
       } catch {
         // Ignore transient background refresh failures.
+      } finally {
+        inFlight = false;
       }
     };
 
@@ -184,6 +193,7 @@ export function RoomStage({ initialRoom }: { initialRoom: RoomSnapshot }) {
             <GalaxyHome
               packs={room.packs}
               students={room.students}
+              paused={face !== "galaxy"}
               onMoveStudent={handleMoveStudent}
             />
           </div>

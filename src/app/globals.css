@@ -159,6 +159,7 @@ body {
 
 .wv-orbit-nodes {
   position: relative;
+  z-index: 2;
   width: 0;
   height: 0;
   pointer-events: none;
@@ -175,7 +176,17 @@ body {
 
 .wv-orbit-cell:hover .wv-orbit-node,
 .wv-orbit-cell:focus-within .wv-orbit-node,
-.wv-orbit-cell[data-paused="true"] .wv-orbit-node {
+.wv-orbit-cell[data-paused="true"] .wv-orbit-node,
+.wv-orbit-cell:hover .wv-node-bob,
+.wv-orbit-cell:focus-within .wv-node-bob,
+.wv-orbit-cell[data-paused="true"] .wv-node-bob {
+  animation-play-state: paused;
+}
+
+.wv-flip-scene[data-face="calendar"] .wv-orbit-node,
+.wv-flip-scene[data-face="calendar"] .wv-node-bob,
+.wv-flip-scene[data-face="calendar"] .wv-node-eye,
+.wv-flip-scene[data-face="calendar"] .wv-node-pet {
   animation-play-state: paused;
 }
 

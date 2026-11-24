@@ -377,9 +377,19 @@ const Galaxy = ({
       premultipliedAlpha: true,
       antialias: false,
       depth: false,
-      stencil: false
+      stencil: false,
+      failIfMajorPerformanceCaveat: true,
     });
     if (!container || !canvas || !gl) return undefined;
+
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    const unmaskedRenderer = debugInfo
+      ? String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) ?? '')
+      : String(gl.getParameter(gl.RENDERER) ?? '');
+    if (/swiftshader|llvmpipe|softpipe|software/i.test(unmaskedRenderer)) {
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      return undefined;
+    }
 
     const parallel = gl.getExtension('KHR_parallel_shader_compile');
     const programs = new Map<number, Variant>();
