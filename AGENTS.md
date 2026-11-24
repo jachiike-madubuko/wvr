@@ -27,8 +27,8 @@ Always read the active stage's `CONTEXT.md` (< 8k tokens) before touching files.
 | **02** | `seed/02_engine/` | `WVR-227` | Done | Domain pace/dwell math, PII gate, SHA-256 capability tokens |
 | **03.1** | `seed/03_screens/01_galaxy_calendar/` | `WVR-228` | Done | 3D Flip Scene (Galaxy Home & Pace Calendar with WavyStackBar) |
 | **03.2** | `seed/03_screens/02_student_profile/` | `WVR-230` | Done | Student Profile, Weaver Wheel, check-ins, 3-step offline drawer (`https://bklit.com/llms.txt` for line & radar charts) |
-| **03.3** | `seed/03_screens/03_student_blocks/` | `WVR-229` | Next | Student Device Deck (`/s/[token]`), YouTube mosaic, padlocks |
-| **04** | `seed/04_verify/` | `WVR-232` | Pending | Pre-commit verification (`check:env`, `test`, `test:db`, `build`) |
+| **03.3** | `seed/03_screens/03_student_blocks/` | `WVR-229` | Done | Student Device Deck (`/s/[token]`), YouTube mosaic, padlocks |
+| **04** | `seed/04_verify/` | `WVR-232` | Next | Pre-commit verification (`check:env`, `test`, `test:db`, `build`, `test:e2e`) |
 
 ## Operating Rules
 - Never commit `.env` or print credentials.
