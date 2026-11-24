@@ -5,23 +5,18 @@ import {
   type PaceSession,
   sessionBand,
 } from "@/domain/pace/pace";
+import type { CollectibleSlot, EquippedLoadout } from "@/lib/collectibles/catalog";
 import { withTeacherDb } from "@/lib/db";
-import type {
-  MoveStudentPayload,
-  RoomCalendarBlock,
-  RoomPack,
-  RoomSnapshot,
-  RoomStudent,
+import {
+  PACK_COLORS,
+  type MoveStudentPayload,
+  type RoomCalendarBlock,
+  type RoomPack,
+  type RoomSnapshot,
+  type RoomStudent,
 } from "@/lib/room/types";
 
-export const PACK_COLORS: Record<string, string> = {
-  pack_cooking: "#f87171",
-  pack_video_games: "#60a5fa",
-  pack_space: "#38bdf8",
-  pack_music: "#c88dfc",
-  pack_fashion: "#f472b6",
-  pack_animals: "#48e29a",
-};
+export { PACK_COLORS };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PACK_RE = /^pack_[a-z0-9_]{2,40}$/;
@@ -261,6 +256,25 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
       [cls.id],
     );
 
+    const collectiblesRes = await client.query<{
+      student_id: string;
+      item_id: string;
+      slot: CollectibleSlot;
+    }>(
+      `SELECT sc.student_id, sc.item_id, sc.slot
+         FROM public.student_collectibles sc
+         JOIN public.students s ON s.id = sc.student_id
+        WHERE s.class_id = $1 AND sc.equipped = true`,
+      [cls.id],
+    );
+
+    const equippedByStudent = new Map<string, EquippedLoadout>();
+    for (const row of collectiblesRes.rows) {
+      const loadout = equippedByStudent.get(row.student_id) ?? {};
+      loadout[row.slot] = row.item_id;
+      equippedByStudent.set(row.student_id, loadout);
+    }
+
     const baseStudents = studentsRes.rows.map((s) => ({
       id: s.id,
       firstName: s.first_name,
@@ -315,6 +329,7 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
         paceBand,
         subjectBands,
         currentLessonTitle: activeLessonTitle,
+        equipped: equippedByStudent.get(stu.id) ?? {},
       };
     });
 

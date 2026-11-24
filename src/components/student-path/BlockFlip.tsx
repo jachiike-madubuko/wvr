@@ -8,7 +8,10 @@ import {
   type MosaicBlock,
   type RawPathPayload,
 } from "@/lib/student-path/deck";
-import type { StudentRosterItem } from "@/lib/student-path/data";
+import type {
+  StudentCollectiblesBundle,
+  StudentRosterItem,
+} from "@/lib/student-path/data";
 import { BreakTimer } from "./BreakTimer";
 import { DrawPad } from "./DrawPad";
 
@@ -17,11 +20,13 @@ export function BlockFlip({
   payload,
   initialCompletedIds,
   roster,
+  initialCollectiblesByStudent: _initialCollectiblesByStudent,
 }: {
   token: string;
   payload: RawPathPayload;
   initialCompletedIds: string[];
   roster: StudentRosterItem[];
+  initialCollectiblesByStudent?: Record<string, StudentCollectiblesBundle>;
 }) {
   const deck = useMemo(() => buildMosaicDeck(payload), [payload]);
   const [student, setStudent] = useState<StudentRosterItem | null>(null);

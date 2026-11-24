@@ -1,3 +1,4 @@
+import type { EquippedLoadout } from "@/lib/collectibles/catalog";
 import { scanForPii } from "@/lib/security/pii";
 
 export type WheelAnswer = {
@@ -82,6 +83,7 @@ export type StudentProfileSnapshot = {
   className: string;
   packId: string;
   packLabel: string;
+  equipped: EquippedLoadout;
   zones: RadarZone[];
   checkins: SelCheckIn[];
   events: BlockEventRecord[];

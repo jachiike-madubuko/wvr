@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { StudentAvatarHalo } from "@/components/avatars/StudentAvatar";
+import { PACK_COLORS } from "@/lib/room/types";
 import type {
   ActionThreadRecord,
   CheckInPoint,
@@ -35,16 +37,24 @@ export function StudentProfileRoom({
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-8 text-[#f6f1ea]">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8892b0]">
-            {initialProfile.className} · {initialProfile.packLabel}
-          </p>
-          <h1
-            className="text-3xl font-bold"
-            style={{ fontFamily: "var(--font-serif-display)" }}
-          >
-            {initialProfile.firstName}
-          </h1>
+        <div className="flex items-center gap-4">
+          <StudentAvatarHalo
+            seed={initialProfile.studentId}
+            equipped={initialProfile.equipped}
+            ringColor={PACK_COLORS[initialProfile.packId] ?? "#38bdf8"}
+            size="md"
+          />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#8892b0]">
+              {initialProfile.className} · {initialProfile.packLabel}
+            </p>
+            <h1
+              className="text-3xl font-bold"
+              style={{ fontFamily: "var(--font-serif-display)" }}
+            >
+              {initialProfile.firstName}
+            </h1>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

@@ -1,3 +1,4 @@
+import type { CollectibleSlot, EquippedLoadout } from "@/lib/collectibles/catalog";
 import { withTeacherDb } from "@/lib/db";
 import {
   buildOfflineCoachingPlan,
@@ -93,6 +94,21 @@ export async function getStudentProfile(
       [studentId],
     );
 
+    const collectiblesRes = await client.query<{
+      item_id: string;
+      slot: CollectibleSlot;
+    }>(
+      `SELECT item_id, slot
+         FROM public.student_collectibles
+        WHERE student_id = $1::uuid AND equipped = true`,
+      [studentId],
+    );
+
+    const equipped: EquippedLoadout = {};
+    for (const row of collectiblesRes.rows) {
+      equipped[row.slot] = row.item_id;
+    }
+
     const checkins: SelCheckIn[] = checkinRes.rows.map((c) => ({
       date: c.checkin_date,
       period: c.period,
@@ -141,6 +157,7 @@ export async function getStudentProfile(
       className: stu.class_name,
       packId: stu.pack_id ?? "pack_space",
       packLabel: stu.pack_label ?? "Space",
+      equipped,
       zones: buildWeaverWheel(
         wheelRes.rows.map((w) => ({ itemId: w.item_id, optionId: w.option_id })),
       ),

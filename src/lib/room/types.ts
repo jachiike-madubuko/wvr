@@ -1,4 +1,14 @@
 import type { PaceBand, PaceCalendarBlock, PacePin, PaceSession } from "@/domain/pace/pace";
+import type { EquippedLoadout } from "@/lib/collectibles/catalog";
+
+export const PACK_COLORS: Record<string, string> = {
+  pack_cooking: "#f87171",
+  pack_video_games: "#60a5fa",
+  pack_space: "#38bdf8",
+  pack_music: "#c88dfc",
+  pack_fashion: "#f472b6",
+  pack_animals: "#48e29a",
+};
 
 export type RoomPack = {
   id: string;
@@ -14,6 +24,7 @@ export type RoomStudent = {
   paceBand: PaceBand;
   subjectBands: Record<string, PaceBand>;
   currentLessonTitle: string | null;
+  equipped?: EquippedLoadout;
 };
 
 export type RoomCalendarBlock = PaceCalendarBlock & {

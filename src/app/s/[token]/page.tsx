@@ -31,6 +31,7 @@ export default async function StudentPathPage({
       payload={data.payload}
       initialCompletedIds={data.progress.completedBlockIds ?? []}
       roster={data.roster}
+      initialCollectiblesByStudent={data.collectiblesByStudent}
     />
   );
 }
