@@ -126,7 +126,7 @@ function PackCluster({
       ref={setNodeRef}
       data-galaxy-cell={pack.id}
       data-drag-over={isTarget ? "true" : undefined}
-      className="relative flex min-h-[210px] flex-col items-center justify-between rounded-[24px] p-5 transition-colors"
+      className="relative flex h-full w-full flex-col items-center justify-center gap-5 rounded-[24px] p-4 transition-colors"
       style={{
         background: isTarget ? "rgba(74, 222, 128, 0.08)" : "transparent",
         border: isTarget ? "2px dashed #4ade80" : "2px solid transparent",
@@ -145,7 +145,7 @@ function PackCluster({
         </span>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-4">
+      <div className="flex flex-wrap items-center justify-center gap-4">
         {members.map((student) => (
           <DraggableStudentNode
             key={student.id}
@@ -244,7 +244,7 @@ export function GalaxyHome({
 
   return (
     <GalaxyField fieldRef={fieldRef}>
-      <div className="mb-6 flex items-end justify-between">
+      <div className="mb-2 flex shrink-0 items-end justify-between">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#58b6fa]">
             Interest Galaxy
@@ -258,7 +258,7 @@ export function GalaxyHome({
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveStudentId(null)}
       >
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-3 sm:gap-4 lg:grid-cols-3">
           {packs.map((pack) => (
             <PackCluster
               key={pack.id}

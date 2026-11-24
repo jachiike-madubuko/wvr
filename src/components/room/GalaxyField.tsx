@@ -24,7 +24,7 @@ export function GalaxyField({
   return (
     <div
       ref={fieldRef}
-      className="relative min-h-[calc(100vh-56px)] w-full overflow-hidden px-6 py-8"
+      className="relative flex h-full w-full flex-col overflow-hidden px-4 py-4 sm:px-6 sm:py-5"
     >
       {/* Instant SSR / no-WebGL CSS fallback */}
       <div className="wv-stars" aria-hidden="true" />
@@ -53,7 +53,9 @@ export function GalaxyField({
         />
       </div>
       {fieldRef && <GalaxyGsapLoop fieldRef={fieldRef} />}
-      <div className="relative z-10 mx-auto max-w-6xl">{children}</div>
+      <div className="relative z-10 flex min-h-0 w-full flex-1 flex-col">
+        {children}
+      </div>
     </div>
   );
 }

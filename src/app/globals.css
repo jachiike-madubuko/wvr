@@ -83,13 +83,13 @@ body {
   perspective: 1800px;
   position: relative;
   width: 100%;
-  min-height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
 }
 
 .wv-flip-card {
   position: relative;
   width: 100%;
-  min-height: calc(100vh - 56px);
+  height: 100%;
   transform-style: preserve-3d;
   transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -102,18 +102,20 @@ body {
   position: absolute;
   inset: 0;
   width: 100%;
-  min-height: calc(100vh - 56px);
+  height: 100%;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
 
 .wv-flip-face--front {
   transform: rotateY(0deg);
+  overflow: hidden;
   z-index: 2;
 }
 
 .wv-flip-face--back {
   transform: rotateY(180deg);
+  overflow-y: auto;
   z-index: 1;
 }
 
