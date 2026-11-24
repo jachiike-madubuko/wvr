@@ -24,6 +24,17 @@
 
   /* Typography */
   --font-serif-display: Georgia, "Newsreader", serif;
+
+  /* Bklit Chart Tokens */
+  --chart-background: #131826;
+  --chart-foreground: #f6f1ea;
+  --chart-foreground-muted: #8892b0;
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-label: #8892b0;
+  --chart-tooltip-background: #111625;
+  --chart-tooltip-foreground: #f6f1ea;
+  --chart-tooltip-muted: #8892b0;
+  --line: rgba(255, 255, 255, 0.1);
 }
 
 * {
