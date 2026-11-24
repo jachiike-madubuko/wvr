@@ -81,7 +81,7 @@ on conflict (student_id, item_id) do nothing;
 insert into public.student_sel_checkins (id, student_id, checkin_date, period, mood, level, teacher_note) values
   ('44444444-4444-4444-8444-444444444401', 'dddddddd-dddd-4ddd-8ddd-dddddddddd01', current_date, 'am', 'focused',    4, 'Ready for space fractions'),
   ('44444444-4444-4444-8444-444444444402', 'dddddddd-dddd-4ddd-8ddd-dddddddddd01', current_date, 'pm', 'frustrated', 2, 'Needed extra fraction tiles')
-on conflict (student_id, checkin_date, period) do nothing;
+on conflict do nothing;
 
 insert into public.student_action_threads (id, student_id, kind, messages, approved_plan, teacher_approved_at)
 values (
@@ -93,3 +93,9 @@ values (
   now()
 )
 on conflict (student_id, kind) do nothing;
+
+insert into public.student_collectibles (student_id, item_id, slot, equipped, milestone_id, recall_note) values
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddd02', 'cooking_chef_toque', 'hat',     true, 'm1_first_block',    'Prepped the station by completing your first Launch & Hook block.'),
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddd03', 'games_pixel_shades', 'eyewear', true, 'm2_practice_block', 'Cleared two guided practice stages without losing focus.'),
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddd04', 'music_note_sprite',  'pet',     true, 'm3_lesson_clear',   'Cleared the full lesson track to summon a floating Eighth-Note Sprite.')
+on conflict (student_id, item_id) do nothing;

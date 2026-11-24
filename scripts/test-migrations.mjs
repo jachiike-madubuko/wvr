@@ -652,6 +652,137 @@ await check("group_membership_events cannot be updated or deleted by weavr_app",
 );
 
 // ---------------------------------------------------------------------------
+console.log("\n5b. Student Collectibles RLS & Capability RPCs\n");
+// ---------------------------------------------------------------------------
+
+await check("student_collectibles enforces Teacher A/B RLS isolation and denies anon table access", async () => {
+  await asTeacher(db, TEACHER_A, async () => {
+    await db.query(
+      `insert into public.student_collectibles (student_id, item_id, slot, equipped, milestone_id, recall_note)
+       values ($1, 'space_helmet', 'hat', true, 'm1_first_block', 'First launch!')`,
+      [STUDENT_A],
+    );
+    const rows = (await db.query("select item_id, equipped from public.student_collectibles where student_id = $1", [STUDENT_A])).rows;
+    if (rows.length !== 1 || rows[0].item_id !== "space_helmet" || rows[0].equipped !== true) {
+      throw new Error(`teacher A could not read own student collectible: ${JSON.stringify(rows)}`);
+    }
+  });
+
+  await asTeacher(db, TEACHER_B, async () => {
+    const rows = (await db.query("select count(*)::int as n from public.student_collectibles where student_id = $1", [STUDENT_A])).rows[0].n;
+    if (rows !== 0) {
+      throw new Error(`teacher B saw ${rows} student_collectibles rows belonging to teacher A`);
+    }
+    await refuses(
+      db,
+      `insert into public.student_collectibles (student_id, item_id, slot, equipped, milestone_id)
+       values ($1, 'space_visor', 'eyewear', false, 'm2_practice_block')`,
+      [STUDENT_A],
+      "row-level security",
+    );
+  });
+
+  await asAnonApp(db, async () => {
+    const rows = (await db.query("select count(*)::int as n from public.student_collectibles")).rows[0].n;
+    if (rows !== 0) {
+      throw new Error(`anon saw ${rows} student_collectibles rows`);
+    }
+    await refuses(
+      db,
+      `insert into public.student_collectibles (student_id, item_id, slot, equipped, milestone_id)
+       values ($1, 'space_visor', 'eyewear', false, 'm2_practice_block')`,
+      [STUDENT_A],
+      "row-level security",
+    );
+  });
+});
+
+await check("anon collectible RPCs support get/unlock/equip/swap/unequip and reject invalid/cross-class/locked", async () => {
+  const hash = (await db.query("select encode(digest('tok-live', 'sha256'), 'hex') as h")).rows[0].h;
+  const expiredHash = (await db.query("select encode(digest('tok-expired', 'sha256'), 'hex') as h")).rows[0].h;
+
+  await asAnonApp(db, async () => {
+    const invalidGet = (await db.query("select public.get_student_collectibles('bad-hash', null) as r")).rows[0].r;
+    const expiredGet = (await db.query("select public.get_student_collectibles($1, null) as r", [expiredHash])).rows[0].r;
+    if (invalidGet !== null || expiredGet !== null) {
+      throw new Error(`invalid/expired get_student_collectibles must return null, got ${JSON.stringify({ invalidGet, expiredGet })}`);
+    }
+
+    const expiredSave = (
+      await db.query("select public.save_student_collectible($1, $2, 'unlock', 'space_cape_hat', 'hat', 'm4_pace_150', 'Note') as r", [
+        expiredHash,
+        STUDENT_A,
+      ])
+    ).rows[0].r;
+    if (expiredSave !== null) {
+      throw new Error(`expired save_student_collectible must return null, got ${JSON.stringify(expiredSave)}`);
+    }
+
+    const allBefore = (await db.query("select public.get_student_collectibles($1, null) as r", [hash])).rows[0].r;
+    if (!allBefore?.[STUDENT_A] || allBefore[STUDENT_A].items?.length !== 1) {
+      throw new Error(`unexpected class collectibles map: ${JSON.stringify(allBefore)}`);
+    }
+
+    const oneBefore = (await db.query("select public.get_student_collectibles($1, $2) as r", [hash, STUDENT_A])).rows[0].r;
+    if (oneBefore?.items?.[0]?.itemId !== "space_helmet" || oneBefore?.items?.[0]?.equipped !== true) {
+      throw new Error(`unexpected single-student collectibles: ${JSON.stringify(oneBefore)}`);
+    }
+
+    // Unlock a second hat (equipped=false)
+    const afterUnlock = (
+      await db.query(
+        "select public.save_student_collectible($1, $2, 'unlock', 'space_crown', 'hat', 'm4_pace_150', 'Reached 150 credits') as r",
+        [hash, STUDENT_A],
+      )
+    ).rows[0].r;
+    const crown = afterUnlock.find((i) => i.itemId === "space_crown");
+    if (!crown || crown.equipped !== false) {
+      throw new Error(`expected unlocked space_crown with equipped=false, got ${JSON.stringify(afterUnlock)}`);
+    }
+
+    // Equip space_crown -> swaps off space_helmet in same slot
+    const afterEquip = (
+      await db.query("select public.save_student_collectible($1, $2, 'equip', 'space_crown', 'hat') as r", [
+        hash,
+        STUDENT_A,
+      ])
+    ).rows[0].r;
+    const helmetAfterSwap = afterEquip.find((i) => i.itemId === "space_helmet");
+    const crownAfterSwap = afterEquip.find((i) => i.itemId === "space_crown");
+    if (helmetAfterSwap?.equipped !== false || crownAfterSwap?.equipped !== true) {
+      throw new Error(`expected slot swap on equip, got ${JSON.stringify(afterEquip)}`);
+    }
+
+    // Unequip space_crown
+    const afterUnequip = (
+      await db.query("select public.save_student_collectible($1, $2, 'unequip', 'space_crown', 'hat') as r", [
+        hash,
+        STUDENT_A,
+      ])
+    ).rows[0].r;
+    if (afterUnequip.some((i) => i.equipped)) {
+      throw new Error(`expected no equipped hats after unequip, got ${JSON.stringify(afterUnequip)}`);
+    }
+
+    // Equipping a locked item is refused
+    await refuses(
+      db,
+      "select public.save_student_collectible($1, $2, 'equip', 'never_unlocked_pet', 'pet')",
+      [hash, STUDENT_A],
+      "collectible not unlocked",
+    );
+
+    // Cross-class student is refused
+    await refuses(
+      db,
+      "select public.save_student_collectible($1, $2, 'unlock', 'space_helmet', 'hat', 'm1_first_block', '')",
+      [hash, STUDENT_B],
+      "student not on this class",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 console.log("\n6. Postgres / Neon Security Advisor Equivalents & Demo Seed\n");
 // ---------------------------------------------------------------------------
 
@@ -660,6 +791,8 @@ const RPC_ALLOWLIST = new Set([
   "open_student_path_roster",
   "save_student_path_progress",
   "save_student_path_session",
+  "get_student_collectibles",
+  "save_student_collectible",
 ]);
 
 await check("no unlisted security definer function is executable by weavr_app", async () => {
