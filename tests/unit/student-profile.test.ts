@@ -88,6 +88,17 @@ test("buildOfflineCoachingPlan returns 3 offline physical teacher steps", () => 
   expect(plan.steps.join(" ")).toContain("Maya");
 });
 
+test("buildOfflineCoachingPlan falls back cleanly to static rules on simulated LLM API 500 / timeout", () => {
+  const plan = buildOfflineCoachingPlan({
+    firstName: "Pulsar",
+    misconception: "Simulated LLM API 500 / Timeout trigger",
+  });
+  expect(plan.misconception).toContain("Rule-based fallback active");
+  expect(plan.steps).toHaveLength(3);
+  expect(plan.steps.join(" ")).toContain("Static Fallback");
+  expect(plan.steps.join(" ")).toContain("Pulsar");
+});
+
 test("validateThreadRequest blocks PII via scanForPii and accepts clean teacher notes", () => {
   const pii = validateThreadRequest({
     kind: "sel",

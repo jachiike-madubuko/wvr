@@ -109,8 +109,8 @@ export function ProfileDrawer({
   };
 
   const misconceptionText =
-    selectedNode?.misconception ??
     ivThread?.approvedPlan?.misconception ??
+    selectedNode?.misconception ??
     "unequal parts";
 
   const activePlan: ApprovedOfflinePlan = {

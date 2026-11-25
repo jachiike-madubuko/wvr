@@ -21,11 +21,13 @@ export function CalendarGrid({
   students,
   blocks,
   sessions,
+  creditMultiplier = 1,
 }: {
   className: string;
   students: RoomStudent[];
   blocks: RoomCalendarBlock[];
   sessions: PaceSession[];
+  creditMultiplier?: number;
 }) {
   const today = isoDate(new Date());
   const defaultAnchor =
@@ -233,7 +235,7 @@ export function CalendarGrid({
           </div>
         </>
       ) : (
-        <PacingTable students={students} />
+        <PacingTable students={students} creditMultiplier={creditMultiplier} />
       )}
     </div>
   );

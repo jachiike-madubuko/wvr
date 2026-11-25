@@ -1,6 +1,8 @@
 import type { PaceBand, PaceCalendarBlock, PacePin, PaceSession } from "@/domain/pace/pace";
 import type { EquippedLoadout } from "@/lib/collectibles/catalog";
 
+export type DemoProfile = "sales_walkthrough" | "interactive_onboarding";
+
 export const PACK_COLORS: Record<string, string> = {
   pack_cooking: "#f87171",
   pack_video_games: "#60a5fa",
@@ -16,6 +18,8 @@ export type RoomPack = {
   color: string;
 };
 
+export type InterventionStatus = "none" | "pending" | "resolved";
+
 export type RoomStudent = {
   id: string;
   firstName: string;
@@ -23,8 +27,13 @@ export type RoomStudent = {
   version: number;
   paceBand: PaceBand;
   subjectBands: Record<string, PaceBand>;
+  subjectWeeks?: Record<string, number>;
   currentLessonTitle: string | null;
   equipped?: EquippedLoadout;
+  isDemo?: boolean;
+  interventionStatus?: InterventionStatus;
+  creditsEarned?: number;
+  creditTarget?: number;
 };
 
 export type RoomCalendarBlock = PaceCalendarBlock & {
@@ -36,6 +45,10 @@ export type RoomSnapshot = {
   classId: string;
   className: string;
   grade: number;
+  demoProfile: DemoProfile;
+  hasDemoData: boolean;
+  demoStudentCount: number;
+  realStudentCount: number;
   packs: RoomPack[];
   students: RoomStudent[];
   blocks: RoomCalendarBlock[];

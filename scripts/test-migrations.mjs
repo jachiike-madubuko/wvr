@@ -861,6 +861,35 @@ await check("no view in public bypasses RLS", async () => {
   }
 });
 
+await check("demo_profile constraint and is_demo safe purge preserve non-demo students", async () => {
+  await asTeacher(db, TEACHER_A, async () => {
+    await refuses(
+      db,
+      "update public.classes set demo_profile = 'invalid_mode' where id = $1",
+      [CLASS_A],
+      "violates check constraint",
+    );
+    await db.query(
+      "update public.classes set demo_profile = 'interactive_onboarding' where id = $1",
+      [CLASS_A],
+    );
+    const demoStu = (
+      await db.query(
+        "insert into public.students (class_id, first_name, sort_key, is_demo) values ($1, 'Nebula', 99, true) returning id, is_demo",
+        [CLASS_A],
+      )
+    ).rows[0];
+    if (!demoStu.is_demo) throw new Error("expected is_demo=true on demo student");
+    await db.query("delete from public.students where class_id = $1 and is_demo = true", [CLASS_A]);
+    const remaining = (
+      await db.query("select id, is_demo from public.students where class_id = $1", [CLASS_A])
+    ).rows;
+    if (remaining.length !== 1 || remaining[0].id !== STUDENT_A || remaining[0].is_demo !== false) {
+      throw new Error(`safe purge corrupted real student: ${JSON.stringify(remaining)}`);
+    }
+  });
+});
+
 await check("db/seed.sql applies cleanly and passes assert_no_student_pii_columns()", async () => {
   await db.exec(readFileSync(SEED_PATH, "utf8"));
   await db.query("select public.assert_no_student_pii_columns()");

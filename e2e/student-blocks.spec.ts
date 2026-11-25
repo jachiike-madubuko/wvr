@@ -6,6 +6,9 @@ const BLOCK_URLS = /google-analytics|googletagmanager|segment\.|hotjar|doublecli
 test.beforeEach(async ({ page }) => {
   await page.route("**/*", (route) => {
     const req = route.request();
+    if (/youtube-nocookie\.com\/embed\//.test(req.url())) {
+      return route.fulfill({ status: 200, contentType: "text/html", body: "<html><body></body></html>" });
+    }
     return BLOCK_TYPES.has(req.resourceType()) || BLOCK_URLS.test(req.url())
       ? route.abort()
       : route.continue();
@@ -15,12 +18,13 @@ test.beforeEach(async ({ page }) => {
 test("rejects invalid capability token fail-closed", async ({ page }) => {
   await page.goto("/s/invalid-token-123", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("invalid-path-link")).toBeVisible();
-  await expect(page.locator('[data-student-pick]')).toHaveCount(0);
+  await expect(page.locator("[data-student-pick]")).toHaveCount(0);
 });
 
-test("walks first-name roster picker and sequential mosaic deck with DrawPad and Check", async ({
+test("renders 2-column Space mosaic with 3D flip activation, lazy hook iframe, and continuous lesson locks", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const pageErrors: string[] = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
 
@@ -28,37 +32,114 @@ test("walks first-name roster picker and sequential mosaic deck with DrawPad and
 
   // Zero logins/passwords on student path
   await expect(page.getByTestId("roster-picker")).toBeVisible();
-  await expect(page.locator('input[type="password"], input[type="email"]')).toHaveCount(0);
+  await expect(
+    page.locator('input[type="password"], input[type="email"]'),
+  ).toHaveCount(0);
 
   await page.locator('[data-student-pick="Maya"]').click();
   await expect(page.getByTestId("mosaic-grid")).toBeVisible();
-  await expect(page.getByTestId("deck-progress")).toContainText("0 of 3 done");
+  await expect(page.getByTestId("deck-progress")).toContainText("0 of 11 done");
+
+  // Verify sketch order, span-2 on hook only, and zero iframes before tap
+  const tiles = page.locator('[data-testid="mosaic-grid"] > button');
+  await expect(tiles).toHaveCount(11);
+  await expect(page.locator("iframe")).toHaveCount(0);
 
   const hookTile = page.locator('[data-block-id="hook"]');
-  const tryTile = page.locator('[data-block-id="try_1"]');
-  const checkTile = page.locator('[data-block-id="check_1"]');
+  const elaTile = page.locator('[data-block-id="ela"]');
+  const artTile = page.locator('[data-block-id="art"]');
+  const lockedContTile = page.locator('[data-block-id="cont_equal_halves"]');
 
   await expect(hookTile).toHaveAttribute("data-span", "2");
-  await expect(hookTile).toHaveAttribute("data-locked", "false");
-  await expect(tryTile).toHaveAttribute("data-locked", "true");
-  await expect(checkTile).toHaveAttribute("data-locked", "true");
+  await expect(page.locator('[data-testid="mosaic-grid"] [data-span]')).toHaveCount(1);
+  await expect(elaTile).toHaveAttribute("data-locked", "false");
+  await expect(artTile).toHaveAttribute("data-locked", "false");
+  await expect(lockedContTile).toHaveAttribute("data-locked", "true");
 
-  // 1. Complete Hero Hook
+  // Verify 2-column reading order (non-decreasing Y, even left / odd right)
+  const hookBox = await hookTile.boundingBox();
+  const elaBox = await elaTile.boundingBox();
+  const artBox = await artTile.boundingBox();
+  expect(hookBox && elaBox && artBox).toBeTruthy();
+  expect(elaBox!.y).toBeGreaterThan(hookBox!.y);
+  expect(artBox!.x).toBeGreaterThan(elaBox!.x);
+
+  // Clicking a locked continuation tile shakes without opening flip modal
+  await lockedContTile.click({ force: true });
+  await expect(lockedContTile).toHaveClass(/wv-pin-shake/);
+  await expect(page.getByTestId("block-modal")).toHaveCount(0);
+
+  // 1. Flip open Space video hook, scrub seek slider, complete
   await hookTile.click();
-  await expect(page.getByTestId("block-modal")).toBeVisible();
+  await expect(page.getByTestId("block-modal")).toHaveAttribute(
+    "data-flip-phase",
+    "open",
+  );
+  await expect(page.getByTestId("hook-video-frame")).toHaveAttribute(
+    "src",
+    /W_B2UZ_ZoxU/,
+  );
+
+  const slider = page.getByRole("slider", { name: "Seek" });
+  await slider.waitFor({ state: "visible" });
+  // Wait for the 3D flip animation to settle before clicking the seek track
+  await page.waitForTimeout(550);
+  const sliderBox = await slider.boundingBox();
+  expect(sliderBox).not.toBeNull();
+  await slider.click({
+    position: {
+      x: Math.max(1, Math.floor(sliderBox!.width * 0.95)),
+      y: Math.max(1, Math.floor(sliderBox!.height / 2)),
+    },
+  });
+
   const hookSave = page.waitForResponse(
-    (r) => r.url().includes("/api/student-path/") && r.request().method() === "POST",
+    (r) =>
+      r.url().includes("/api/student-path/") &&
+      r.url().includes("/session") &&
+      r.request().method() === "POST",
   );
   await page.getByTestId("block-complete-btn").click();
   expect((await hookSave).status()).toBe(200);
+  await expect(page.getByTestId("deck-progress")).toContainText("1 of 11 done");
+  await expect(page.getByTestId("block-modal")).toHaveCount(0);
 
-  await expect(page.getByTestId("deck-progress")).toContainText("1 of 3 done");
-  await expect(tryTile).toHaveAttribute("data-locked", "false");
-  await expect(checkTile).toHaveAttribute("data-locked", "true");
+  // 2. Flip open ELA, Escape closes without completing, then answer "blue"
+  await elaTile.click();
+  await expect(page.getByTestId("block-modal")).toHaveAttribute(
+    "data-flip-phase",
+    "open",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("block-modal")).toHaveCount(0);
+  await expect(page.getByTestId("deck-progress")).toContainText("1 of 11 done");
 
-  // 2. Complete DrawPad Try block
-  await tryTile.click();
+  await elaTile.click();
+  await expect(page.getByTestId("block-modal")).toHaveAttribute(
+    "data-flip-phase",
+    "open",
+  );
+  await page.locator('[data-choice-id="a"]').click();
+  const elaSave = page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/student-path/") &&
+      r.url().includes("/session") &&
+      r.request().method() === "POST",
+  );
+  await page.getByTestId("block-complete-btn").click();
+  expect((await elaSave).status()).toBe(200);
+  await expect(page.getByTestId("deck-progress")).toContainText("2 of 11 done");
+  await expect(page.getByTestId("block-modal")).toHaveCount(0);
+
+  // 3. Flip open Art DrawPad and complete
+  await artTile.click();
+  await expect(page.getByTestId("block-modal")).toHaveAttribute(
+    "data-flip-phase",
+    "open",
+  );
   const canvas = page.getByTestId("drawpad-canvas");
+  await canvas.waitFor({ state: "visible" });
+  await page.waitForTimeout(550);
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + 40, box!.y + 40);
@@ -66,34 +147,32 @@ test("walks first-name roster picker and sequential mosaic deck with DrawPad and
   await page.mouse.move(box!.x + 140, box!.y + 90, { steps: 6 });
   await page.mouse.up();
 
-  const trySave = page.waitForResponse(
-    (r) => r.url().includes("/api/student-path/") && r.request().method() === "POST",
+  const artSave = page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/student-path/") &&
+      r.url().includes("/session") &&
+      r.request().method() === "POST",
   );
   await page.getByTestId("block-complete-btn").click();
-  expect((await trySave).status()).toBe(200);
+  expect((await artSave).status()).toBe(200);
+  await expect(page.getByTestId("deck-progress")).toContainText("3 of 11 done");
+  await expect(page.getByTestId("block-modal")).toHaveCount(0);
 
-  await expect(page.getByTestId("deck-progress")).toContainText("2 of 3 done");
-  await expect(checkTile).toHaveAttribute("data-locked", "false");
-
-  // 3. Complete Check block
-  await checkTile.click();
-  await page.locator('[data-choice-id="a"]').click();
-  const checkSave = page.waitForResponse(
-    (r) => r.url().includes("/api/student-path/") && r.request().method() === "POST",
-  );
-  await page.getByTestId("block-complete-btn").click();
-  expect((await checkSave).status()).toBe(200);
-
-  await expect(page.getByTestId("deck-progress")).toContainText("3 of 3 done");
   expect(pageErrors).toEqual([]);
 });
 
 test("unlocks collectibles, equips hat/eyewear/pet, persists across reload, and syncs to Galaxy", async ({
   page,
+  request,
 }) => {
   test.setTimeout(60_000);
   const pageErrors: string[] = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
+
+  const roomData = (await (await request.get("/api/room")).json()) as {
+    students: { id: string; firstName: string }[];
+  };
+  const mayaId = roomData.students.find((s) => s.firstName === "Maya")!.id;
 
   await page.goto("/s/demo-space-lesson", { waitUntil: "domcontentloaded" });
   await page.locator('[data-student-pick="Maya"]').click();
@@ -162,9 +241,7 @@ test("unlocks collectibles, equips hat/eyewear/pet, persists across reload, and 
 
   // Verify equipped items sync to Maya's node on / (Galaxy Home)
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const mayaNode = page.locator(
-    '[data-student-id="dddddddd-dddd-4ddd-8ddd-dddddddddd01"]',
-  );
+  const mayaNode = page.locator(`[data-student-id="${mayaId}"]`);
   await expect(mayaNode).toBeVisible();
   for (const itemId of targetItems) {
     await expect(

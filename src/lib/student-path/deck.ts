@@ -3,25 +3,24 @@ import {
   sanitizeCompletedBlockIds,
   type BlockMs,
 } from "@/domain/pace/block-dwell";
-import { CHOICES, type BlockRole } from "@/lib/blocks/library";
+import { byId, CHOICES, type BlockRole } from "@/lib/blocks/library";
+import {
+  spaceContinuationBlocks,
+  spaceFlipBlocks,
+  wideHook,
+  type FlipBlock,
+} from "@/lib/lesson/space-pins";
 
-export type MosaicBlock = {
-  id: string;
-  title: string;
-  role: BlockRole;
-  kind: "video.story" | "image.draw" | "text.question" | "pbl.social" | "next";
-  subject: "hook" | "math" | "ela" | "science" | "art";
+export type MosaicBlock = FlipBlock & {
   span: 1 | 2;
-  instr: string;
-  cta: string;
-  choices?: { id: string; text: string; ok: boolean }[];
 };
 
 export type RawPathPayload = {
   title?: string;
   packId?: string;
   packLabel?: string;
-  blocks?: Array<{ id?: string; title?: string; role?: string }>;
+  profile?: string;
+  blocks?: Array<{ id?: string; title?: string; role?: string; badge?: string }>;
 };
 
 function normalizeRole(raw?: string): BlockRole {
@@ -32,7 +31,21 @@ function normalizeRole(raw?: string): BlockRole {
   return "start";
 }
 
+function toMosaicBlock(entry: FlipBlock): MosaicBlock {
+  return {
+    ...entry,
+    span: wideHook(entry) ? 2 : 1,
+  };
+}
+
 export function buildMosaicDeck(payload: RawPathPayload): MosaicBlock[] {
+  const isSpaceDeck = !payload.packId || payload.packId === "pack_space";
+  if (isSpaceDeck) {
+    return [...spaceFlipBlocks(), ...spaceContinuationBlocks()].map(
+      toMosaicBlock,
+    );
+  }
+
   const rawBlocks = Array.isArray(payload.blocks) ? payload.blocks : [];
   if (rawBlocks.length === 0) return [];
 
@@ -42,55 +55,47 @@ export function buildMosaicDeck(payload: RawPathPayload): MosaicBlock[] {
     const title = String(b.title ?? `Block ${idx + 1}`);
 
     if (idx === 0 || role === "start") {
-      return {
+      return toMosaicBlock({
+        ...byId("video.story"),
         id,
         title,
         role: "start",
         kind: "video.story",
         subject: "hook",
-        span: idx === 0 ? 2 : 1,
-        instr: "Watch Sunny and her sister on Station Luna to launch today's mission.",
-        cta: "Start the lesson",
-      };
+      });
     }
 
     if (role === "try") {
-      return {
+      return toMosaicBlock({
+        ...byId("image.draw"),
         id,
         title,
         role: "try",
         kind: "image.draw",
         subject: "art",
-        span: 1,
-        instr: "Draw a line to split the moon into 2 equal halves.",
-        cta: "Save my drawing",
-      };
+      });
     }
 
     if (role === "check") {
-      return {
+      return toMosaicBlock({
+        ...byId("text.question"),
         id,
         title,
         role: "check",
         kind: "text.question",
         subject: "math",
-        span: 1,
-        instr: "Which picture shows equal halves?",
-        cta: "Lock in my answer",
         choices: CHOICES,
-      };
+      });
     }
 
-    return {
+    return toMosaicBlock({
+      ...byId("pbl.project"),
       id,
       title,
       role: "next",
       kind: "next",
       subject: "science",
-      span: 1,
-      instr: "Synthesize what you discovered in your own words.",
-      cta: "Complete mission",
-    };
+    });
   });
 }
 
@@ -99,7 +104,18 @@ export function isBlockUnlocked(
   completedIds: string[],
   blocks: MosaicBlock[],
 ): boolean {
+  const target = blocks[index];
+  if (!target) return false;
   if (index <= 0) return true;
+
+  const isDemoDeck = blocks[0]?.demo === true;
+  if (isDemoDeck) {
+    // All 5 demo tiles plus the first connected continuation tile (#6) start unlocked.
+    if (target.demo || index === 5) return true;
+    const prev = blocks[index - 1];
+    return prev ? completedIds.includes(prev.id) : true;
+  }
+
   const done = new Set(completedIds);
   for (let i = 0; i < index; i++) {
     const prev = blocks[i];
@@ -133,13 +149,22 @@ export function buildSessionPayload(input: {
   for (const ev of rawEvents.slice(0, 20)) {
     if (!ev || typeof ev !== "object") continue;
     const rec = ev as Record<string, unknown>;
-    const blockId = typeof rec.blockId === "string" ? rec.blockId.trim().slice(0, 80) : "";
+    const blockId =
+      typeof rec.blockId === "string" ? rec.blockId.trim().slice(0, 80) : "";
     const subject = typeof rec.subject === "string" ? rec.subject.trim() : "";
     if (!blockId || !subject) continue;
-    const attempts = Math.min(99, Math.max(0, Math.floor(Number(rec.attempts) || 1)));
-    const durationSec = Math.min(14400, Math.max(0, Math.floor(Number(rec.durationSec) || 1)));
+    const attempts = Math.min(
+      99,
+      Math.max(0, Math.floor(Number(rec.attempts) || 1)),
+    );
+    const durationSec = Math.min(
+      14400,
+      Math.max(0, Math.floor(Number(rec.durationSec) || 1)),
+    );
     const errorLog = Array.isArray(rec.errorLog)
-      ? rec.errorLog.filter((x): x is string => typeof x === "string").slice(0, 8)
+      ? rec.errorLog
+          .filter((x): x is string => typeof x === "string")
+          .slice(0, 8)
       : [];
     blockEvents.push({ blockId, subject, attempts, durationSec, errorLog });
   }

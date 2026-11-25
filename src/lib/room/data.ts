@@ -7,8 +7,10 @@ import {
 } from "@/domain/pace/pace";
 import type { CollectibleSlot, EquippedLoadout } from "@/lib/collectibles/catalog";
 import { withTeacherDb } from "@/lib/db";
+import { isDemoProfile, type DemoProfile } from "@/lib/demo/seed";
 import {
   PACK_COLORS,
+  type InterventionStatus,
   type MoveStudentPayload,
   type RoomCalendarBlock,
   type RoomPack,
@@ -112,11 +114,11 @@ export function buildPaceSessions(args: {
     );
   }
 
-  const byStudent = new Map<string, PaceSession>();
+  const byStudentBlock = new Map<string, PaceSession>();
   for (const ps of args.pathSessions) {
     const stu = args.students.find((s) => s.id === ps.studentId);
     if (!stu) continue;
-    byStudent.set(ps.studentId, {
+    byStudentBlock.set(`${ps.studentId}:${ps.calendarBlockId}`, {
       studentId: ps.studentId,
       firstName: stu.firstName,
       calendarBlockId: ps.calendarBlockId,
@@ -128,9 +130,12 @@ export function buildPaceSessions(args: {
   for (const ev of args.blockEvents) {
     const stu = args.students.find((s) => s.id === ev.studentId);
     if (!stu) continue;
-    let session = byStudent.get(ev.studentId);
+    const blockId = firstLesson?.id ?? null;
+    const key = `${ev.studentId}:${blockId ?? "none"}`;
+    let session =
+      Array.from(byStudentBlock.values()).find((s) => s.studentId === ev.studentId) ??
+      byStudentBlock.get(key);
     if (!session) {
-      const blockId = firstLesson?.id ?? null;
       session = {
         studentId: ev.studentId,
         firstName: stu.firstName,
@@ -138,7 +143,7 @@ export function buildPaceSessions(args: {
         blockMs: {},
         pins: blockId ? (pinsByBlock.get(blockId) ?? []) : [],
       };
-      byStudent.set(ev.studentId, session);
+      byStudentBlock.set(key, session);
     }
     const pin = session.pins.find((p) => p.id === ev.blockId);
     const baseMs = Math.max(0, ev.durationSec * 1000);
@@ -148,18 +153,26 @@ export function buildPaceSessions(args: {
     session.blockMs[ev.blockId] = Math.max(session.blockMs[ev.blockId] ?? 0, effectiveMs);
   }
 
-  return Array.from(byStudent.values());
+  return Array.from(byStudentBlock.values());
 }
 
 export async function getRoomSnapshot(): Promise<RoomSnapshot> {
   return withTeacherDb(async (client) => {
-    const classRes = await client.query<{ id: string; name: string; grade: number }>(
-      `SELECT id, name, grade FROM public.classes ORDER BY created_at ASC LIMIT 1`,
+    const classRes = await client.query<{
+      id: string;
+      name: string;
+      grade: number;
+      demo_profile: string;
+    }>(
+      `SELECT id, name, grade, demo_profile FROM public.classes ORDER BY created_at ASC LIMIT 1`,
     );
     const cls = classRes.rows[0];
     if (!cls) {
       throw new Error("No class found for teacher");
     }
+    const demoProfile: DemoProfile = isDemoProfile(cls.demo_profile)
+      ? cls.demo_profile
+      : "sales_walkthrough";
 
     const packsRes = await client.query<{ id: string; label: string }>(
       `SELECT id, label FROM public.context_packs WHERE is_published = true ORDER BY label ASC`,
@@ -175,8 +188,9 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
       first_name: string;
       pack_id: string | null;
       version: number;
+      is_demo: boolean;
     }>(
-      `SELECT s.id, s.first_name, m.pack_id, COALESCE(m.version, 0) AS version
+      `SELECT s.id, s.first_name, m.pack_id, COALESCE(m.version, 0) AS version, s.is_demo
          FROM public.students s
          LEFT JOIN public.group_memberships m ON m.student_id = s.id
         WHERE s.class_id = $1
@@ -245,15 +259,35 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
       student_id: string;
       block_id: string;
       subject: string;
+      attempts: number;
       duration_sec: number;
       status: string;
+      created_at: Date;
     }>(
-      `SELECT e.student_id, e.block_id, e.subject, e.duration_sec, e.status
+      `SELECT e.student_id, e.block_id, e.subject, e.attempts, e.duration_sec, e.status, e.created_at
          FROM public.block_events e
          JOIN public.students s ON s.id = e.student_id
         WHERE s.class_id = $1
         ORDER BY e.created_at ASC`,
       [cls.id],
+    );
+
+    const threadsRes = await client.query<{
+      student_id: string;
+      teacher_approved_at: Date | null;
+    }>(
+      `SELECT t.student_id, t.teacher_approved_at
+         FROM public.student_action_threads t
+         JOIN public.students s ON s.id = t.student_id
+        WHERE s.class_id = $1 AND t.kind = 'iv'`,
+      [cls.id],
+    );
+
+    const ivByStudent = new Map<string, { approvedAt: Date | null }>(
+      threadsRes.rows.map((r) => [
+        r.student_id,
+        { approvedAt: r.teacher_approved_at ? new Date(r.teacher_approved_at) : null },
+      ]),
     );
 
     const collectiblesRes = await client.query<{
@@ -280,6 +314,7 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
       firstName: s.first_name,
       packId: s.pack_id ?? packs[0]?.id ?? "pack_space",
       version: Number(s.version),
+      isDemo: Boolean(s.is_demo),
     }));
 
     const sessions = buildPaceSessions({
@@ -305,38 +340,104 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
     const activeLessonTitle =
       blocks.find((b) => b.kind === "lesson")?.title ?? null;
 
+    const todayLessonId =
+      blocks.find((b) => b.kind === "lesson" && b.startDate === b.endDate && b.startDate >= new Date().toISOString().slice(0, 10))?.id ??
+      blocks.filter((b) => b.kind === "lesson").at(-1)?.id ??
+      null;
+
     const students: RoomStudent[] = baseStudents.map((stu) => {
-      const session = sessions.find((s) => s.studentId === stu.id);
+      const session =
+        (todayLessonId
+          ? sessions.find((s) => s.studentId === stu.id && s.calendarBlockId === todayLessonId)
+          : undefined) ?? sessions.find((s) => s.studentId === stu.id);
       const stuEvents = eventsRes.rows.filter((e) => e.student_id === stu.id);
-      const paceBand: PaceBand = session
-        ? sessionBand(session).band
-        : "on";
+      const ivRow = ivByStudent.get(stu.id);
+      const struggleEvents = stuEvents.filter((e) => e.status === "struggling");
+      const latestStruggleMs = struggleEvents.reduce(
+        (max, e) => Math.max(max, new Date(e.created_at).getTime()),
+        0,
+      );
+      const ivResolved =
+        Boolean(ivRow?.approvedAt) &&
+        (latestStruggleMs === 0 || ivRow!.approvedAt!.getTime() >= latestStruggleMs);
+
+      const interventionStatus: InterventionStatus = ivResolved
+        ? "resolved"
+        : ivRow || struggleEvents.length > 0
+          ? "pending"
+          : "none";
+
+      let paceBand: PaceBand = session ? sessionBand(session).band : "on";
+      if (paceBand === "behind" && ivResolved && struggleEvents.length <= 1) {
+        paceBand = "on";
+      }
 
       const subjectBands: Record<string, PaceBand> = {};
-      for (const subj of ["math", "ela"]) {
+      const subjectWeeks: Record<string, number> = {};
+      for (const subj of ["math", "ela", "science", "social_studies", "art"]) {
         const subEv = stuEvents.filter((e) => e.subject === subj);
-        if (subEv.some((e) => e.status === "struggling")) {
-          subjectBands[subj] = "behind";
-        } else if (subEv.some((e) => e.status === "completed")) {
-          subjectBands[subj] = "ahead";
+        const struggles = subEv.filter((e) => e.status === "struggling");
+        const completed = subEv.filter((e) => e.status === "completed");
+        if (struggles.length > 0) {
+          const severe =
+            struggles.length >= 2 || struggles.some((e) => e.duration_sec >= 360);
+          const rawWeek = severe ? -2 : -1;
+          const adjustedWeek = ivResolved ? Math.min(0, rawWeek + 1) : rawWeek;
+          subjectWeeks[subj] = adjustedWeek;
+          subjectBands[subj] = adjustedWeek < 0 ? "behind" : "on";
+        } else if (completed.length > 0) {
+          const fast = completed.filter(
+            (e) => e.attempts <= 1 && e.duration_sec <= 90,
+          );
+          if (fast.length > 0) {
+            subjectBands[subj] = "ahead";
+            subjectWeeks[subj] = fast.length >= 2 ? 2 : 1;
+          } else {
+            subjectBands[subj] = "on";
+            subjectWeeks[subj] = 0;
+          }
         } else {
           subjectBands[subj] = paceBand;
+          subjectWeeks[subj] =
+            paceBand === "behind" ? -1 : paceBand === "ahead" ? 1 : 0;
         }
       }
+
+      const rawCredits = stuEvents.reduce((sum, e) => {
+        if (e.status === "struggling") return sum + 1;
+        if (e.status === "completed" && e.attempts <= 1 && e.duration_sec <= 90) {
+          return sum + 6;
+        }
+        return sum + 3;
+      }, 0);
+      const creditsEarned = rawCredits + (ivResolved ? 5 : 0);
+      const creditTarget =
+        paceBand === "ahead" ? 30 : paceBand === "behind" ? 20 : 15;
 
       return {
         ...stu,
         paceBand,
         subjectBands,
+        subjectWeeks,
         currentLessonTitle: activeLessonTitle,
         equipped: equippedByStudent.get(stu.id) ?? {},
+        interventionStatus,
+        creditsEarned,
+        creditTarget,
       };
     });
+
+    const demoStudentCount = students.filter((s) => s.isDemo).length;
+    const realStudentCount = students.length - demoStudentCount;
 
     return {
       classId: cls.id,
       className: cls.name,
       grade: cls.grade,
+      demoProfile,
+      hasDemoData: demoStudentCount > 0 || blocks.length > 0,
+      demoStudentCount,
+      realStudentCount,
       packs,
       students,
       blocks,

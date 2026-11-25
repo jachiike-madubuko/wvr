@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import type { RoomSnapshot } from "@/lib/room/types";
 import { CalendarGrid } from "./CalendarGrid";
+import { DemoControlDrawer } from "./DemoControlDrawer";
 import { GalaxyHome } from "./GalaxyHome";
 
 export function RoomStage({ initialRoom }: { initialRoom: RoomSnapshot }) {
   const [room, setRoom] = useState<RoomSnapshot>(initialRoom);
   const [face, setFace] = useState<"galaxy" | "calendar">("galaxy");
   const [conflictMsg, setConflictMsg] = useState<string | null>(null);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const [creditMultiplier, setCreditMultiplier] = useState(1);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -160,8 +163,34 @@ export function RoomStage({ initialRoom }: { initialRoom: RoomSnapshot }) {
           </button>
         </nav>
 
-        <div className="text-xs text-[#8892b0]">Grade {room.grade}</div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            data-testid="demo-settings-btn"
+            onClick={() => setDemoOpen(true)}
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-200 hover:bg-white/10"
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#58b6fa]" />
+            <span>
+              {room.demoProfile === "interactive_onboarding"
+                ? "Demo: Onboarding"
+                : "Demo: Sales"}
+            </span>
+          </button>
+          <span className="text-xs text-[#8892b0]">Grade {room.grade}</span>
+        </div>
       </header>
+
+      <DemoControlDrawer
+        room={room}
+        open={demoOpen}
+        face={face}
+        creditMultiplier={creditMultiplier}
+        onClose={() => setDemoOpen(false)}
+        onRoomUpdated={setRoom}
+        onFaceChange={setFace}
+        onCreditMultiplierChange={setCreditMultiplier}
+      />
 
       {conflictMsg && (
         <div
@@ -207,6 +236,7 @@ export function RoomStage({ initialRoom }: { initialRoom: RoomSnapshot }) {
               students={room.students}
               blocks={room.blocks}
               sessions={room.sessions}
+              creditMultiplier={creditMultiplier}
             />
           </div>
         </div>

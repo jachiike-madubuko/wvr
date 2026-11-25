@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-const MAYA_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddd01";
 const BLOCK_TYPES = new Set(["image", "font", "media"]);
 const BLOCK_URLS = /google-analytics|googletagmanager|segment\.|hotjar|doubleclick|posthog/;
 
@@ -15,11 +14,17 @@ test.beforeEach(async ({ page }) => {
 
 test("renders Maya profile with Bklit Weaver Wheel, Check-ins, Mastery chart, and drawers", async ({
   page,
+  request,
 }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
 
-  await page.goto(`/students/${MAYA_ID}`, { waitUntil: "domcontentloaded" });
+  const roomData = (await (await request.get("/api/room")).json()) as {
+    students: { id: string; firstName: string }[];
+  };
+  const mayaId = roomData.students.find((s) => s.firstName === "Maya")!.id;
+
+  await page.goto(`/students/${mayaId}`, { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "Maya" })).toBeVisible();
   await expect(page.getByTestId("view-current-blocks")).toHaveAttribute(

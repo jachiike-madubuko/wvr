@@ -177,11 +177,12 @@ export async function saveStudentThread(
   if (!isValidUuid(studentId)) return null;
 
   return withTeacherDb(async (client) => {
-    const stuRes = await client.query<{ first_name: string }>(
-      `SELECT first_name FROM public.students WHERE id = $1::uuid`,
+    const stuRes = await client.query<{ first_name: string; is_demo: boolean }>(
+      `SELECT first_name, is_demo FROM public.students WHERE id = $1::uuid`,
       [studentId],
     );
     const firstName = stuRes.rows[0]?.first_name;
+    const isDemo = Boolean(stuRes.rows[0]?.is_demo);
     if (!firstName) return null;
 
     const existingRes = await client.query<{
@@ -209,11 +210,16 @@ export async function saveStudentThread(
         },
       ];
       await client.query(
-        `INSERT INTO public.student_action_threads (student_id, kind, messages)
-         VALUES ($1::uuid, 'sel', $2::jsonb)
+        `INSERT INTO public.student_action_threads (student_id, kind, messages, is_demo)
+         VALUES ($1::uuid, 'sel', $2::jsonb, $3)
          ON CONFLICT (student_id, kind) DO UPDATE
            SET messages = excluded.messages`,
-        [studentId, JSON.stringify(nextMessages)],
+        [studentId, JSON.stringify(nextMessages), isDemo],
+      );
+      await client.query(
+        `INSERT INTO public.events (teacher_id, name, payload, is_demo)
+         VALUES (public.current_teacher_id(), 'student.sel_note', $1::jsonb, $2)`,
+        [JSON.stringify({ studentId }), isDemo],
       );
       return {
         kind: "sel",
@@ -238,14 +244,21 @@ export async function saveStudentThread(
 
     await client.query(
       `INSERT INTO public.student_action_threads
-         (student_id, kind, messages, approved_plan, teacher_approved_at)
-       VALUES ($1::uuid, 'iv', $2::jsonb, $3::jsonb, $4::timestamptz)
+         (student_id, kind, messages, approved_plan, teacher_approved_at, is_demo)
+       VALUES ($1::uuid, 'iv', $2::jsonb, $3::jsonb, $4::timestamptz, $5)
        ON CONFLICT (student_id, kind) DO UPDATE
          SET messages = excluded.messages,
              approved_plan = excluded.approved_plan,
              teacher_approved_at = excluded.teacher_approved_at`,
-      [studentId, JSON.stringify(nextMessages), JSON.stringify(plan), approvedAt],
+      [studentId, JSON.stringify(nextMessages), JSON.stringify(plan), approvedAt, isDemo],
     );
+    if (req.action === "approve") {
+      await client.query(
+        `INSERT INTO public.events (teacher_id, name, payload, is_demo)
+         VALUES (public.current_teacher_id(), 'student.intervention_resolved', $1::jsonb, $2)`,
+        [JSON.stringify({ studentId, misconception: plan.misconception }), isDemo],
+      );
+    }
 
     return {
       kind: "iv",

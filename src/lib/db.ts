@@ -65,3 +65,31 @@ export async function withAnonDb<T>(
     client.release();
   }
 }
+
+/**
+ * Server-only unpooled transaction for demo seed/reset/purge routes.
+ * Enforces direct Neon URL (never -pooler) so prepared statements and
+ * transactional swaps stay atomic without PgBouncer session drift.
+ */
+export async function withUnpooledAdminDb<T>(
+  fn: (client: PoolClient) => Promise<T>,
+  directUrl: string,
+): Promise<T> {
+  if (/-pooler\./i.test(directUrl)) {
+    throw new Error("Refusing admin seed over a pooled (-pooler) Neon URL");
+  }
+  const pool = new Pool({ connectionString: directUrl, max: 2, idleTimeoutMillis: 10_000 });
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+    await pool.end().catch(() => {});
+  }
+}

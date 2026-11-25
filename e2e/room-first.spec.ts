@@ -14,25 +14,36 @@ test.beforeEach(async ({ page }) => {
 
 test("renders Galaxy Home, flips to Pace Calendar with G/C shortcuts, and toggles Swimlane Table", async ({
   page,
+  request,
 }) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
 
+  // Ensure deterministic sales_walkthrough baseline
+  await request.post("/api/demo", {
+    data: { action: "switch", profile: "sales_walkthrough" },
+  });
+  const roomData = (await (await request.get("/api/room")).json()) as {
+    students: { id: string; firstName: string }[];
+  };
+  const mayaId = roomData.students.find((s) => s.firstName === "Maya")!.id;
+  const leoId = roomData.students.find((s) => s.firstName === "Leo")!.id;
+
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("Room 204", { exact: true })).toBeVisible();
-  for (const name of ["Maya", "Leo", "Zoe", "Noah", "Ava", "Kai"]) {
+  for (const name of ["Nebula", "Maya", "Cosmo", "Astra", "Pulsar", "Leo", "Zoe", "Noah"]) {
     await expect(page.locator(`[data-student-id]`, { hasText: name })).toBeVisible();
   }
 
   // Upgraded SVG avatars, orbiting nodes, and seeded equipped collectibles
-  expect(await page.locator(".wv-orbit-node").count()).toBeGreaterThanOrEqual(6);
+  expect(await page.locator(".wv-orbit-node").count()).toBeGreaterThanOrEqual(8);
   expect(
     await page.locator("[data-student-id] svg.wv-node-avatar").count(),
-  ).toBeGreaterThanOrEqual(6);
+  ).toBeGreaterThanOrEqual(8);
   await expect(
     page.locator(
-      '[data-student-id="dddddddd-dddd-4ddd-8ddd-dddddddddd02"] [data-equipped-item="cooking_chef_toque"]',
+      `[data-student-id="${leoId}"] [data-equipped-item="cooking_chef_toque"]`,
     ),
   ).toBeVisible();
 
@@ -49,9 +60,9 @@ test("renders Galaxy Home, flips to Pace Calendar with G/C shortcuts, and toggle
 
   // Toggle to Swimlane Table
   await page.getByTestId("cal-view-table").click();
-  await expect(page.locator('[data-testid^="student-row-"]')).toHaveCount(6);
+  await expect(page.locator('[data-testid^="student-row-"]')).toHaveCount(8);
   await expect(
-    page.locator('a[href="/students/dddddddd-dddd-4ddd-8ddd-dddddddddd01"]').first(),
+    page.locator(`a[href="/students/${mayaId}"]`).first(),
   ).toBeVisible();
 
   // Keyboard shortcut G flips back to Galaxy
@@ -67,10 +78,18 @@ test("renders Galaxy Home, flips to Pace Calendar with G/C shortcuts, and toggle
   expect(pageErrors).toEqual([]);
 });
 
-test("enforces strict 500ms hover delay before showing student popover", async ({ page }) => {
+test("enforces strict 500ms hover delay before showing student popover", async ({
+  page,
+  request,
+}) => {
+  const roomData = (await (await request.get("/api/room")).json()) as {
+    students: { id: string; firstName: string }[];
+  };
+  const mayaId = roomData.students.find((s) => s.firstName === "Maya")!.id;
+
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  const mayaNode = page.locator('[data-student-id="dddddddd-dddd-4ddd-8ddd-dddddddddd01"]');
+  const mayaNode = page.locator(`[data-student-id="${mayaId}"]`);
   const popover = page.getByTestId("student-popover");
 
   // Hover < 500ms: popover must NOT appear
@@ -89,7 +108,7 @@ test("enforces strict 500ms hover delay before showing student popover", async (
   await expect(popover).toBeVisible();
   await expect(popover).toContainText("Maya");
   await expect(
-    popover.locator('a[href="/students/dddddddd-dddd-4ddd-8ddd-dddddddddd01"]'),
+    popover.locator(`a[href="/students/${mayaId}"]`),
   ).toBeVisible();
 });
 
@@ -97,14 +116,14 @@ test("drags student to another cluster, persists across reload, and returns 409 
   page,
   request,
 }) => {
-  const leoId = "dddddddd-dddd-4ddd-8ddd-dddddddddd02";
   const initialRes = await request.get("/api/room");
   expect(initialRes.ok()).toBe(true);
   const initialRoom = (await initialRes.json()) as {
-    students: { id: string; packId: string; version: number }[];
+    students: { id: string; firstName: string; packId: string; version: number }[];
   };
-  const leoBefore = initialRoom.students.find((s) => s.id === leoId);
+  const leoBefore = initialRoom.students.find((s) => s.firstName === "Leo");
   expect(leoBefore).toBeDefined();
+  const leoId = leoBefore!.id;
 
   const originalPack = leoBefore!.packId;
   const targetPack = originalPack === "pack_space" ? "pack_cooking" : "pack_space";
