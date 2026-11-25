@@ -1,0 +1,22 @@
+---
+issue_id: WVR-000
+issue_link: https://linear.app/weaver-edu/issue/WVR-000
+stage: stories
+round: 0
+waiting_on: WVR.dev
+updated: 2026-11-25 08:30 MST (America/Denver)
+---
+
+# WVR-000
+
+Copy this folder with `prototypes/scripts/status.sh init <issue-id>`. Do not edit `_template/` in place.
+
+Allowed `stage` values: `stories`, `redteam`, `build`, `test`, `improve`, `sent`, `decided`.
+
+Allowed `round` values: `0` (stories and red team), `1` (first build and test), `2` (revision and retest). Round 3 is refused by `scripts/status.sh`.
+
+Update this file with:
+
+```bash
+prototypes/scripts/status.sh set WVR-000 --stage <stage> --round <0-2> --waiting-on "<name>"
+```
