@@ -124,6 +124,35 @@ export function isBlockUnlocked(
   return true;
 }
 
+export type AttemptState = {
+  attempts: number;
+  wrongChoices: string[];
+};
+
+export function nextAttemptState(
+  state: AttemptState,
+  answer: string | null,
+  correct: boolean,
+): AttemptState {
+  const attempts = Math.min(99, state.attempts + 1);
+  if (correct || !answer) {
+    return { attempts, wrongChoices: state.wrongChoices };
+  }
+  const trimmed = answer.trim().slice(0, 200);
+  if (!trimmed || state.wrongChoices.length >= 8) {
+    return { attempts, wrongChoices: state.wrongChoices };
+  }
+  return {
+    attempts,
+    wrongChoices: [...state.wrongChoices, trimmed],
+  };
+}
+
+export function isCorrectRiddle(guess: string, answer: string): boolean {
+  const norm = guess.trim().toLowerCase();
+  return norm.length > 0 && norm.includes(answer.trim().toLowerCase());
+}
+
 export type BlockEventInput = {
   blockId: string;
   subject: string;

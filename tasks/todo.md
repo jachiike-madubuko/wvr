@@ -32,13 +32,13 @@ Tracked in Linear (`weaver-edu` / **WVR** / **Weavr Clean Rebuild**). One commit
 - [x] Verify, commit, push, comment + tick Nov 26 ACs on **WVR-233** (do NOT change status)
 
 ## Task 5: WVR-238 + `weaver-config` (§5a) — Track click data & attempts as struggle signal
-- [ ] Create `src/domain/config/weaver-config.ts` and switch `buildMasteryNodes` in `src/lib/students/model.ts` to `isStruggleEvent()`
-- [ ] Create `src/lib/events/allowlist.ts` (`EVENT_PAYLOAD_KEYS`, `assertAllowedPayload`)
-- [ ] Generalize attempt tracking (`recordAttempt`) in `src/components/student-path/BlockFlip.tsx` across `text.question`, `riddle`, `pbl.manipulative`, `game.brain` (keep Make Ten target/button behavior intact)
-- [ ] Add `db/migrations/008_block_events_tracking.sql` recreating `save_student_path_session` to propagate `students.is_demo` and append `student.block_submitted` to `public.events`
-- [ ] Apply migration `008` to Neon DB (`node scripts/migrate.mjs`)
-- [ ] Add unit tests (attempt counting, payload sanitizer, allowlist) + migration tests in `scripts/test-migrations.mjs` + E2E test in `e2e/student-blocks.spec.ts`
-- [ ] Verify, commit, push, update **WVR-238**
+- [x] Create `src/domain/config/weaver-config.ts` and switch `buildMasteryNodes` in `src/lib/students/model.ts` to `isStruggleEvent()`
+- [x] Create `src/lib/events/allowlist.ts` (`EVENT_PAYLOAD_KEYS`, `assertAllowedPayload`)
+- [x] Generalize attempt tracking (`recordAttempt`) in `src/components/student-path/BlockFlip.tsx` across `text.question`, `riddle`, `pbl.manipulative`, `game.brain` (keep Make Ten target/button behavior intact)
+- [x] Add `db/migrations/008_block_events_tracking.sql` recreating `save_student_path_session` to propagate `students.is_demo` and append `student.block_submitted` to `public.events`
+- [x] Apply migration `008` to Neon DB (`node scripts/migrate.mjs`)
+- [x] Add unit tests (attempt counting, payload sanitizer, allowlist) + migration tests in `scripts/test-migrations.mjs` + E2E test in `e2e/student-blocks.spec.ts`
+- [x] Verify, commit, push, update **WVR-238**
 
 ## Task 6: WVR-239 — Simulate fast & struggling students on `/s/[token]` (Demo Data Mode, revertible, live Mastery chart)
 - [ ] Create `src/lib/demo/simulate.ts` (`generateSimulation`) driven by `weaverConfig`

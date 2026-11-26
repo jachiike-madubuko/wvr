@@ -1,3 +1,4 @@
+import { isStruggleEvent } from "@/domain/config/weaver-config";
 import type { EquippedLoadout } from "@/lib/collectibles/catalog";
 import { scanForPii } from "@/lib/security/pii";
 
@@ -166,8 +167,7 @@ export function buildMasteryNodes(
   filter: MasteryFilter,
 ): MasteryNode[] {
   const baseNodes: MasteryNode[] = events.map((ev) => {
-    const isStruggle =
-      ev.status === "struggling" || ev.attempts >= 3 || ev.durationSec > 200;
+    const isStruggle = isStruggleEvent(ev);
     const kind = isStruggle ? "struggle" : "strength";
     const dimmed =
       (filter === "strengths" && kind !== "strength") ||
@@ -203,9 +203,7 @@ export function buildMasteryNodes(
       list.reduce((sum, e) => sum + e.durationSec, 0) / list.length,
     );
     const maxAttempts = Math.max(...list.map((e) => e.attempts));
-    const struggle = list.find(
-      (e) => e.status === "struggling" || e.attempts >= 3 || e.durationSec > 200,
-    );
+    const struggle = list.find((e) => isStruggleEvent(e));
     const kind = struggle ? "struggle" : "strength";
     const dimmed =
       (filter === "strengths" && kind !== "strength") ||

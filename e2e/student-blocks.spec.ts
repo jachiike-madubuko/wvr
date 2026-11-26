@@ -251,3 +251,55 @@ test("unlocks collectibles, equips hat/eyewear/pet, persists across reload, and 
 
   expect(pageErrors).toEqual([]);
 });
+
+test("counts multiple attempts on a block and flags >= highAttempts as a struggle node on profile", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90_000);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (err) => pageErrors.push(err.message));
+
+  try {
+    const roomData = (await (await request.get("/api/room")).json()) as {
+      students: { id: string; firstName: string }[];
+    };
+    const cosmoId = roomData.students.find((s) => s.firstName === "Cosmo")!.id;
+
+    await page.goto("/s/demo-space-lesson", { waitUntil: "domcontentloaded" });
+    await page.locator('[data-student-pick="Cosmo"]').click();
+
+    await page.locator('[data-block-id="ela"]').click();
+    await expect(page.getByTestId("block-modal")).toHaveAttribute("data-flip-phase", "open");
+    await page.waitForTimeout(550);
+
+    // Click two wrong answers then the right answer -> 3 attempts (>= alerts.highAttempts)
+    await page.locator('[data-choice-id="b"]').click();
+    await page.locator('[data-choice-id="c"]').click();
+    await page.locator('[data-choice-id="a"]').click();
+
+    const saveRes = page.waitForResponse(
+      (r) =>
+        r.url().includes("/api/student-path/") &&
+        r.url().includes("/session") &&
+        r.request().method() === "POST",
+    );
+    await page.getByTestId("block-complete-btn").click();
+    expect((await saveRes).status()).toBe(200);
+
+    // Open Cosmo's profile: 3 attempts renders as a struggle node with "3 tries" in tooltip
+    await page.goto(`/students/${cosmoId}`, { waitUntil: "domcontentloaded" });
+    const struggleNode = page
+      .locator('[data-testid="mastery-chart"] svg [data-testid^="mastery-node-"][data-kind="struggle"]')
+      .last();
+    await expect(struggleNode).toBeVisible();
+    await struggleNode.focus();
+    await expect(page.getByTestId("mastery-chart")).toContainText("3 tries");
+
+    expect(pageErrors).toEqual([]);
+  } finally {
+    await request.post("/api/demo", {
+      data: { action: "reset", profile: "sales_walkthrough" },
+    });
+  }
+});

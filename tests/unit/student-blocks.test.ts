@@ -1,5 +1,7 @@
 import { expect, test } from "vitest";
+import { isStruggleEvent, weaverConfig } from "@/domain/config/weaver-config";
 import { B, byId, FACE } from "@/lib/blocks/library";
+import { assertAllowedPayload } from "@/lib/events/allowlist";
 import {
   spaceContinuationBlocks,
   spaceFlipBlocks,
@@ -11,6 +13,8 @@ import {
   buildMosaicDeck,
   buildSessionPayload,
   isBlockUnlocked,
+  isCorrectRiddle,
+  nextAttemptState,
 } from "@/lib/student-path/deck";
 
 test("block library defines 4 roles and 21 sub-types across 6 types", () => {
@@ -95,4 +99,57 @@ test("buildSessionPayload sanitizes completedBlockIds and blockMs and matches se
   expect(payload.completedBlockIds).toEqual(["hook", "art"]);
   expect(payload.blockMs).toEqual({ hook: 12000 });
   expect(payload.blockEvents).toHaveLength(1);
+});
+
+test("nextAttemptState counts attempts and wrong answers across block kinds, and buildSessionPayload preserves attempts > 1", () => {
+  let state = { attempts: 0, wrongChoices: [] as string[] };
+  state = nextAttemptState(state, "planet", false);
+  state = nextAttemptState(state, "window", false);
+  state = nextAttemptState(state, "blue", true);
+  expect(state.attempts).toBe(3);
+  expect(state.wrongChoices).toEqual(["planet", "window"]);
+
+  // Brain game mismatch records attempt with null answer
+  let brain = { attempts: 0, wrongChoices: [] as string[] };
+  brain = nextAttemptState(brain, null, false);
+  brain = nextAttemptState(brain, null, true);
+  expect(brain).toEqual({ attempts: 2, wrongChoices: [] });
+
+  expect(isCorrectRiddle("A window!", "window")).toBe(true);
+  expect(isCorrectRiddle("door", "window")).toBe(false);
+
+  // Non-text.question block kinds preserve attempts > 1 through payload sanitizer
+  const payload = buildSessionPayload({
+    completedBlockIds: ["science", "cont_make_ten", "cont_fuel_match"],
+    blockMs: { science: 30_000, cont_make_ten: 45_000, cont_fuel_match: 50_000 },
+    blockEvents: [
+      { blockId: "science", subject: "science", attempts: 4, durationSec: 30, errorLog: ["door", "mirror"] },
+      { blockId: "cont_make_ten", subject: "math", attempts: 3, durationSec: 45, errorLog: ["20", "30"] },
+      { blockId: "cont_fuel_match", subject: "math", attempts: 5, durationSec: 50, errorLog: [] },
+    ],
+  });
+  expect(payload.blockEvents.map((e) => e.attempts)).toEqual([4, 3, 5]);
+  expect(isStruggleEvent({ status: "completed", attempts: weaverConfig.alerts.highAttempts, durationSec: 30 })).toBe(true);
+  expect(isStruggleEvent({ status: "completed", attempts: 1, durationSec: 30 })).toBe(false);
+});
+
+test("assertAllowedPayload permits allowlisted event keys and rejects extra or PII keys", () => {
+  expect(() =>
+    assertAllowedPayload("student.block_submitted", {
+      studentId: "11111111-1111-4111-8111-111111111111",
+      blockId: "math",
+      attempts: 3,
+      durationSec: 120,
+    }),
+  ).not.toThrow();
+
+  expect(() =>
+    assertAllowedPayload("student.block_submitted", {
+      studentId: "11111111-1111-4111-8111-111111111111",
+      blockId: "math",
+      attempts: 3,
+      durationSec: 120,
+      firstName: "Maya",
+    }),
+  ).toThrow("EVENT_KEY_NOT_ALLOWED:student.block_submitted.firstName");
 });

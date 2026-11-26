@@ -29,6 +29,8 @@ import type {
 import {
   buildMosaicDeck,
   isBlockUnlocked,
+  isCorrectRiddle,
+  nextAttemptState,
   type MosaicBlock,
   type RawPathPayload,
 } from "@/lib/student-path/deck";
@@ -98,8 +100,11 @@ export function BlockFlip({
   const [watched, setWatched] = useState(0);
   const [strokes, setStrokes] = useState(0);
   const [pickedChoice, setPickedChoice] = useState<string | null>(null);
-  const [wrongChoices, setWrongChoices] = useState<string[]>([]);
-  const [attempts, setAttempts] = useState(0);
+  const [attemptState, setAttemptState] = useState<{
+    attempts: number;
+    wrongChoices: string[];
+  }>({ attempts: 0, wrongChoices: [] });
+  const [riddleFeedback, setRiddleFeedback] = useState<string | null>(null);
   const [riddleGuess, setRiddleGuess] = useState("");
   const [clueCount, setClueCount] = useState(0);
   const [tens, setTens] = useState(0);
@@ -169,8 +174,8 @@ export function BlockFlip({
     setWatched(0);
     setStrokes(0);
     setPickedChoice(null);
-    setWrongChoices([]);
-    setAttempts(0);
+    setAttemptState({ attempts: 0, wrongChoices: [] });
+    setRiddleFeedback(null);
     setRiddleGuess("");
     setClueCount(0);
     setTens(0);
@@ -264,11 +269,29 @@ export function BlockFlip({
     }
   };
 
+  const recordAttempt = useCallback((answer: string | null, correct: boolean) => {
+    setAttemptState((cur) => nextAttemptState(cur, answer, correct));
+  }, []);
+
   const handleComplete = async () => {
     if (!activeBlock || !student || !canComplete || saving) return;
     if (activeBlock.kind === "placeholder") {
       closeFlip();
       return;
+    }
+
+    let submitAttempts = attemptState.attempts;
+    let submitWrong = attemptState.wrongChoices;
+    if (activeBlock.kind === "riddle") {
+      const guess = riddleGuess.trim();
+      const next = nextAttemptState(
+        attemptState,
+        guess,
+        isCorrectRiddle(guess, RIDDLE.answer),
+      );
+      submitAttempts = next.attempts;
+      submitWrong = next.wrongChoices;
+      setAttemptState(next);
     }
 
     setSaving(true);
@@ -277,8 +300,7 @@ export function BlockFlip({
       ? completedIds
       : [...completedIds, activeBlock.id];
 
-    const finalAttempts =
-      activeBlock.kind === "text.question" ? Math.max(1, attempts) : 1;
+    const finalAttempts = Math.max(1, submitAttempts);
 
     try {
       const res = await fetch(
@@ -296,7 +318,7 @@ export function BlockFlip({
                 subject: activeBlock.subject,
                 attempts: finalAttempts,
                 durationSec: Math.max(1, Math.round(dwellMs / 1000)),
-                errorLog: wrongChoices,
+                errorLog: submitWrong,
               },
             ],
           }),
@@ -899,14 +921,7 @@ export function BlockFlip({
                                 data-choice-id={c.id}
                                 onClick={() => {
                                   setPickedChoice(c.id);
-                                  setAttempts((a) => a + 1);
-                                  if (c.ok === false) {
-                                    setWrongChoices((prev) =>
-                                      prev.includes(c.text)
-                                        ? prev
-                                        : [...prev, c.text],
-                                    );
-                                  }
+                                  recordAttempt(c.text, c.ok !== false);
                                 }}
                                 style={{
                                   background: selected
@@ -969,9 +984,29 @@ export function BlockFlip({
                           data-testid="riddle-input"
                           placeholder="Type your answer..."
                           value={riddleGuess}
-                          onChange={(e) => setRiddleGuess(e.target.value)}
+                          onChange={(e) => {
+                            setRiddleGuess(e.target.value);
+                            setRiddleFeedback(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && riddleGuess.trim()) {
+                              const guess = riddleGuess.trim();
+                              const ok = isCorrectRiddle(guess, RIDDLE.answer);
+                              recordAttempt(guess, ok);
+                              setRiddleFeedback(
+                                ok
+                                  ? "Nice! Tap Lock in my guess to finish."
+                                  : "Not quite — try another guess or grab a clue.",
+                              );
+                            }
+                          }}
                           className="w-full rounded-xl border-0 bg-white/75 px-3.5 py-2.5 text-sm font-semibold text-[#04243b] placeholder:text-[#04243b]/50"
                         />
+                        {riddleFeedback && (
+                          <p className="m-0 text-xs font-semibold opacity-85">
+                            {riddleFeedback}
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -1008,7 +1043,14 @@ export function BlockFlip({
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => setTens((t) => Math.min(5, t + 1))}
+                            onClick={() => {
+                              const nextTens = Math.min(5, tens + 1);
+                              const nextTotal = nextTens * 10 + ones;
+                              setTens(nextTens);
+                              if (nextTotal >= 10) {
+                                recordAttempt(String(nextTotal), nextTotal === 10);
+                              }
+                            }}
                             style={{
                               background: flipFace.ink,
                               color: flipFace.bg,
@@ -1019,7 +1061,14 @@ export function BlockFlip({
                           </button>
                           <button
                             type="button"
-                            onClick={() => setOnes((o) => Math.min(20, o + 1))}
+                            onClick={() => {
+                              const nextOnes = Math.min(20, ones + 1);
+                              const nextTotal = tens * 10 + nextOnes;
+                              setOnes(nextOnes);
+                              if (nextTotal >= 10) {
+                                recordAttempt(String(nextTotal), nextTotal === 10);
+                              }
+                            }}
                             className="flex-1 rounded-full bg-black/15 py-2 text-xs font-bold"
                           >
                             + One
@@ -1107,6 +1156,9 @@ export function BlockFlip({
                                     );
                                     if (prevPair === pIdx) {
                                       setMatchedPairs((m) => [...m, pIdx]);
+                                      recordAttempt(null, true);
+                                    } else {
+                                      recordAttempt(null, false);
                                     }
                                     setFirstTile(null);
                                   }}

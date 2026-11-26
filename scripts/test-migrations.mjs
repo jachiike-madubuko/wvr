@@ -890,6 +890,95 @@ await check("demo_profile constraint and is_demo safe purge preserve non-demo st
   });
 });
 
+await check("save_student_path_session propagates is_demo and appends allowlisted student.block_submitted events", async () => {
+  const hash = (await db.query("select encode(digest('tok-live', 'sha256'), 'hex') as h")).rows[0].h;
+
+  // Real (non-demo) student STUDENT_A already saved 2 events in section 4
+  const realBlockEvents = (
+    await db.query(
+      "select block_id, is_demo from public.block_events where student_id = $1 order by block_id",
+      [STUDENT_A],
+    )
+  ).rows;
+  if (realBlockEvents.length < 2 || realBlockEvents.some((r) => r.is_demo !== false)) {
+    throw new Error(`expected is_demo=false on real student block_events: ${JSON.stringify(realBlockEvents)}`);
+  }
+
+  const realLedger = (
+    await db.query(
+      "select name, payload, is_demo from public.events where name = 'student.block_submitted' and payload->>'studentId' = $1",
+      [STUDENT_A],
+    )
+  ).rows;
+  if (realLedger.length !== 2 || realLedger.some((r) => r.is_demo !== false)) {
+    throw new Error(`expected 2 real student.block_submitted events, got ${JSON.stringify(realLedger)}`);
+  }
+  const allowedKeys = ["attempts", "blockId", "durationSec", "studentId"];
+  for (const row of realLedger) {
+    const keys = Object.keys(row.payload).sort();
+    if (JSON.stringify(keys) !== JSON.stringify(allowedKeys)) {
+      throw new Error(`unexpected student.block_submitted keys: ${JSON.stringify(keys)}`);
+    }
+  }
+
+  // Demo student session propagates is_demo = true to sessions, block_events, and public.events
+  const DEMO_STU = "dddddddd-dddd-4ddd-8ddd-ddddddddde01";
+  await asTeacher(db, TEACHER_A, async () => {
+    await db.query(
+      "insert into public.students (id, class_id, first_name, sort_key, is_demo) values ($1, $2, 'Comet', 50, true)",
+      [DEMO_STU, CLASS_A],
+    );
+  });
+
+  await asAnonApp(db, async () => {
+    await db.query("select public.save_student_path_session($1, $2, $3::jsonb)", [
+      hash,
+      DEMO_STU,
+      JSON.stringify({
+        completedBlockIds: ["science"],
+        blockMs: { science: 45_000 },
+        blockEvents: [
+          { blockId: "science", subject: "science", attempts: 4, durationSec: 45, errorLog: ["wrong guess"] },
+        ],
+      }),
+    ]);
+  });
+
+  const demoBe = (
+    await db.query(
+      "select status, attempts, is_demo from public.block_events where student_id = $1",
+      [DEMO_STU],
+    )
+  ).rows;
+  if (demoBe.length !== 1 || demoBe[0].is_demo !== true || demoBe[0].status !== "struggling" || demoBe[0].attempts !== 4) {
+    throw new Error(`unexpected demo block_events row: ${JSON.stringify(demoBe)}`);
+  }
+
+  const demoSess = (
+    await db.query("select is_demo from public.student_path_sessions where student_id = $1", [DEMO_STU])
+  ).rows;
+  if (demoSess.length !== 1 || demoSess[0].is_demo !== true) {
+    throw new Error(`expected is_demo=true on demo student_path_sessions: ${JSON.stringify(demoSess)}`);
+  }
+
+  const demoLedger = (
+    await db.query(
+      "select payload, is_demo from public.events where name = 'student.block_submitted' and payload->>'studentId' = $1",
+      [DEMO_STU],
+    )
+  ).rows;
+  if (demoLedger.length !== 1 || demoLedger[0].is_demo !== true) {
+    throw new Error(`expected is_demo=true student.block_submitted event: ${JSON.stringify(demoLedger)}`);
+  }
+  const demoKeys = Object.keys(demoLedger[0].payload).sort();
+  if (JSON.stringify(demoKeys) !== JSON.stringify(allowedKeys)) {
+    throw new Error(`unexpected demo student.block_submitted keys: ${JSON.stringify(demoKeys)}`);
+  }
+
+  // Cleanup demo test student so subsequent assertions see clean state
+  await db.query("delete from public.students where id = $1", [DEMO_STU]);
+});
+
 await check("db/seed.sql applies cleanly and passes assert_no_student_pii_columns()", async () => {
   await db.exec(readFileSync(SEED_PATH, "utf8"));
   await db.query("select public.assert_no_student_pii_columns()");
