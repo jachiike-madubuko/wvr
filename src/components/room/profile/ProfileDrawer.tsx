@@ -109,17 +109,21 @@ export function ProfileDrawer({
   };
 
   const misconceptionText =
-    ivThread?.approvedPlan?.misconception ??
     selectedNode?.misconception ??
+    ivThread?.approvedPlan?.misconception ??
     "unequal parts";
 
   const activePlan: ApprovedOfflinePlan = {
     misconception: misconceptionText,
-    steps: ivThread?.approvedPlan?.steps ?? [
-      `1. Manipulative Check: Work side-by-side with ${firstName} using physical paper strips.`,
-      `2. Partner Scaffolding: Pair ${firstName} for a 1-minute verbal comparison.`,
-      `3. Quick Check: 2 oral exit prompts offline before resuming.`,
-    ],
+    steps:
+      ivThread?.approvedPlan &&
+      ivThread.approvedPlan.misconception === misconceptionText
+        ? ivThread.approvedPlan.steps
+        : [
+            `1. Manipulative Check: Work side-by-side with ${firstName} using physical paper strips to model "${misconceptionText}".`,
+            `2. Partner Scaffolding: Pair ${firstName} for a 1-minute verbal comparison.`,
+            `3. Quick Check: 2 oral exit prompts offline before resuming.`,
+          ],
   };
 
   return (

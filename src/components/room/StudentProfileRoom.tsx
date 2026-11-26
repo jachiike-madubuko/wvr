@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StudentAvatarHalo } from "@/components/avatars/StudentAvatar";
 import { weaverConfig } from "@/domain/config/weaver-config";
 import { PACK_COLORS } from "@/lib/room/types";
-import type {
-  ActionThreadRecord,
-  CheckInPoint,
-  MasteryFilter,
-  MasteryNode,
-  MasteryZoom,
-  StudentProfileSnapshot,
+import {
+  buildMasteryNodes,
+  type ActionThreadRecord,
+  type CheckInPoint,
+  type MasteryFilter,
+  type MasteryNode,
+  type MasteryZoom,
+  type StudentProfileSnapshot,
 } from "@/lib/students/model";
 import { CheckInTrend } from "./profile/CheckInTrend";
 import { MasteryChart } from "./profile/MasteryChart";
@@ -69,8 +70,10 @@ function useLiveProfile(initial: StudentProfileSnapshot): StudentProfileSnapshot
 
 export function StudentProfileRoom({
   initialProfile,
+  initialAlertEventId = null,
 }: {
   initialProfile: StudentProfileSnapshot;
+  initialAlertEventId?: string | null;
 }) {
   const profile = useLiveProfile(initialProfile);
   const [selThread, setSelThread] = useState<ActionThreadRecord | null>(
@@ -84,6 +87,18 @@ export function StudentProfileRoom({
   const [selectedNode, setSelectedNode] = useState<MasteryNode | null>(null);
   const [zoom, setZoom] = useState<MasteryZoom>("day");
   const [filter, setFilter] = useState<MasteryFilter>("both");
+
+  const flaggedNode = useMemo(() => {
+    if (!initialAlertEventId) return null;
+    const dayNodes = buildMasteryNodes(profile.events, "day", "both");
+    return dayNodes.find((n) => n.id === initialAlertEventId) ?? null;
+  }, [initialAlertEventId, profile.events]);
+
+  useEffect(() => {
+    if (flaggedNode && !selectedNode) {
+      setSelectedNode(flaggedNode);
+    }
+  }, [flaggedNode, selectedNode]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-8 text-[#f6f1ea]">
@@ -144,10 +159,55 @@ export function StudentProfileRoom({
       </section>
 
       <section className="rounded-[24px] border border-white/10 bg-[#111728] p-6">
+        {flaggedNode && flaggedNode.kind === "struggle" && (
+          <div
+            data-testid="flagged-alert-banner"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f87171]/40 bg-[#f87171]/10 px-4 py-3"
+          >
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#fca5a5]">
+                Flagged Struggle · {flaggedNode.label}
+              </p>
+              <p className="mt-0.5 text-xs text-[#f6f1ea]">
+                {flaggedNode.attempts} tries · {flaggedNode.durationSec}s
+                {flaggedNode.misconception ? ` · ${flaggedNode.misconception}` : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              data-testid="start-intervention-btn"
+              onClick={() => {
+                setSelectedNode(flaggedNode);
+                setDrawerMode("iv");
+              }}
+              className="rounded-full bg-[#f87171] px-4 py-1.5 text-xs font-bold text-[#05070e] hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+            >
+              Start intervention
+            </button>
+          </div>
+        )}
+
+        {flaggedNode && flaggedNode.kind === "strength" && (
+          <div
+            data-testid="fast-student-banner"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#58b6fa]/40 bg-[#58b6fa]/10 px-4 py-3"
+          >
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#93c5fd]">
+                Ready for more · {flaggedNode.label}
+              </p>
+              <p className="mt-0.5 text-xs text-[#f6f1ea]">
+                Completed recent blocks quickly on the first try ({flaggedNode.durationSec}s). Informational notice only — no intervention drafted.
+              </p>
+            </div>
+          </div>
+        )}
+
         <MasteryChart
           events={profile.events}
           zoom={zoom}
           filter={filter}
+          flaggedNodeId={flaggedNode?.id ?? null}
           onZoom={setZoom}
           onFilter={setFilter}
           onSelectNode={(node) => {

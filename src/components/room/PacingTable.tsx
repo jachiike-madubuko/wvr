@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import type { PaceBand } from "@/domain/pace/pace";
 import { addDays, isoDate, shortDate } from "@/lib/room/dates";
 import type { RoomStudent } from "@/lib/room/types";
+import { AlertMark } from "./AlertMark";
 
 const SUBJECTS = [
   { id: "math", label: "Math", code: "M" },
@@ -277,12 +278,20 @@ export function PacingTable({
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <Link
-                        href={`/students/${student.id}`}
-                        className="font-semibold text-[#f6f1ea] hover:underline"
-                      >
-                        {student.firstName}
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <Link
+                          href={`/students/${student.id}`}
+                          className="font-semibold text-[#f6f1ea] hover:underline"
+                        >
+                          {student.firstName}
+                        </Link>
+                        {student.alert && (
+                          <AlertMark
+                            studentId={student.id}
+                            alert={student.alert}
+                          />
+                        )}
+                      </div>
                       <p className="truncate text-[11px] text-[#8892b0]">
                         {subtitle}
                         {student.creditsEarned !== undefined &&

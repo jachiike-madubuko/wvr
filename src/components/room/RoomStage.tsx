@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { weaverConfig } from "@/domain/config/weaver-config";
 import type { RoomSnapshot } from "@/lib/room/types";
 import { CalendarGrid } from "./CalendarGrid";
 import { DemoControlDrawer } from "./DemoControlDrawer";
@@ -67,10 +68,17 @@ export function RoomStage({ initialRoom }: { initialRoom: RoomSnapshot }) {
       }
     };
 
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refreshRoom();
+      }
+    }, weaverConfig.alerts.latencyTargetMs);
+
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };

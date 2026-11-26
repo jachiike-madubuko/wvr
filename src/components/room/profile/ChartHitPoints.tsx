@@ -13,6 +13,7 @@ export interface ChartHitPoint<T> {
   kind?: string;
   testId?: string;
   dataIndex?: number;
+  flagged?: boolean;
   payload: T;
 }
 
@@ -39,6 +40,18 @@ function ChartHitPointsInner<T>({
               : null;
         return (
           <g key={item.id}>
+            {item.flagged && (
+              <circle
+                cx={cx}
+                cy={cy}
+                r={(item.radius ?? 5) + 6}
+                fill="none"
+                stroke={item.color}
+                strokeWidth={2}
+                strokeDasharray="3 2"
+                opacity={0.95}
+              />
+            )}
             <circle
               cx={cx}
               cy={cy}
@@ -57,6 +70,7 @@ function ChartHitPointsInner<T>({
               data-testid={item.testId}
               data-hit-id={item.id}
               data-kind={item.kind}
+              data-flagged={item.flagged ? "true" : undefined}
               style={{ cursor: "pointer" }}
               className="outline-none focus-visible:stroke-[#58b6fa] focus-visible:stroke-2"
               onClick={(e) => {

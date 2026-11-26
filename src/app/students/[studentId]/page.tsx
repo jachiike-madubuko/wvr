@@ -6,10 +6,16 @@ export const dynamic = "force-dynamic";
 
 export default async function StudentProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ studentId: string }>;
+  searchParams: Promise<{ alert?: string | string[] }>;
 }) {
-  const { studentId } = await params;
+  const [{ studentId }, query] = await Promise.all([params, searchParams]);
+  const initialAlertEventId =
+    typeof query.alert === "string" && query.alert.trim()
+      ? query.alert.trim()
+      : null;
   const profile = await getStudentProfile(studentId);
 
   if (!profile) {
@@ -32,5 +38,10 @@ export default async function StudentProfilePage({
     );
   }
 
-  return <StudentProfileRoom initialProfile={profile} />;
+  return (
+    <StudentProfileRoom
+      initialProfile={profile}
+      initialAlertEventId={initialAlertEventId}
+    />
+  );
 }

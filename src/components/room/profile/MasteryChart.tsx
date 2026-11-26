@@ -30,6 +30,7 @@ export function MasteryChart({
   events,
   zoom,
   filter,
+  flaggedNodeId = null,
   onZoom,
   onFilter,
   onSelectNode,
@@ -37,6 +38,7 @@ export function MasteryChart({
   events: BlockEventRecord[];
   zoom: MasteryZoom;
   filter: MasteryFilter;
+  flaggedNodeId?: string | null;
   onZoom: (zoom: MasteryZoom) => void;
   onFilter: (filter: MasteryFilter) => void;
   onSelectNode: (node: MasteryNode) => void;
@@ -159,11 +161,19 @@ export function MasteryChart({
                 id: r.node.id,
                 testId: `mastery-node-${r.node.id}`,
                 dataIndex: idx,
+                flagged: flaggedNodeId === r.node.id,
                 date: r.date,
                 y: r.node.durationSec,
                 color: r.node.kind === "struggle" ? CORAL : MINT,
-                radius: r.node.dimmed ? 3 : r.node.kind === "struggle" ? 7 : 5,
-                opacity: r.node.dimmed ? 0.25 : 1,
+                radius:
+                  flaggedNodeId === r.node.id
+                    ? 8
+                    : r.node.dimmed
+                      ? 3
+                      : r.node.kind === "struggle"
+                        ? 7
+                        : 5,
+                opacity: r.node.dimmed && flaggedNodeId !== r.node.id ? 0.25 : 1,
                 ariaLabel: `${r.node.label}, ${r.node.attempts} tries, ${r.node.durationSec}s`,
                 kind: r.node.kind,
                 payload: r.node,

@@ -1,3 +1,4 @@
+import type { StudentAlert } from "@/domain/alerts/rules";
 import type { PaceBand, PaceCalendarBlock, PacePin, PaceSession } from "@/domain/pace/pace";
 import type { EquippedLoadout } from "@/lib/collectibles/catalog";
 
@@ -32,6 +33,7 @@ export type RoomStudent = {
   equipped?: EquippedLoadout;
   isDemo?: boolean;
   interventionStatus?: InterventionStatus;
+  alert?: StudentAlert | null;
   creditsEarned?: number;
   creditTarget?: number;
 };

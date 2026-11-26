@@ -1,3 +1,5 @@
+import { evaluateStudent } from "@/domain/alerts/rules";
+import { isStruggleEvent } from "@/domain/config/weaver-config";
 import { recommendedBlockMs } from "@/domain/pace/block-dwell";
 import {
   type PaceBand,
@@ -259,6 +261,7 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
     );
 
     const eventsRes = await client.query<{
+      id: string;
       student_id: string;
       block_id: string;
       subject: string;
@@ -267,7 +270,7 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
       status: string;
       created_at: Date;
     }>(
-      `SELECT e.student_id, e.block_id, e.subject, e.attempts, e.duration_sec, e.status, e.created_at
+      `SELECT e.id, e.student_id, e.block_id, e.subject, e.attempts, e.duration_sec, e.status, e.created_at
          FROM public.block_events e
          JOIN public.students s ON s.id = e.student_id
         WHERE s.class_id = $1
@@ -357,20 +360,52 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
           : undefined) ?? sessions.find((s) => s.studentId === stu.id);
       const stuEvents = eventsRes.rows.filter((e) => e.student_id === stu.id);
       const ivRow = ivByStudent.get(stu.id);
-      const struggleEvents = stuEvents.filter((e) => e.status === "struggling");
+      const struggleEvents = stuEvents.filter((e) =>
+        isStruggleEvent({
+          status: e.status,
+          attempts: Number(e.attempts),
+          durationSec: Number(e.duration_sec),
+        }),
+      );
       const latestStruggleMs = struggleEvents.reduce(
         (max, e) => Math.max(max, new Date(e.created_at).getTime()),
         0,
       );
+      const approvedAtMs = ivRow?.approvedAt ? ivRow.approvedAt.getTime() : 0;
       const ivResolved =
         Boolean(ivRow?.approvedAt) &&
-        (latestStruggleMs === 0 || ivRow!.approvedAt!.getTime() >= latestStruggleMs);
+        (latestStruggleMs === 0 || approvedAtMs >= latestStruggleMs);
 
       const interventionStatus: InterventionStatus = ivResolved
         ? "resolved"
         : ivRow || struggleEvents.length > 0
           ? "pending"
           : "none";
+
+      // Exclude struggle events already resolved by an approved offline coaching plan
+      const activeAlertEvents = stuEvents
+        .filter((e) => {
+          const evIsStruggle = isStruggleEvent({
+            status: e.status,
+            attempts: Number(e.attempts),
+            durationSec: Number(e.duration_sec),
+          });
+          if (evIsStruggle && approvedAtMs > 0 && new Date(e.created_at).getTime() <= approvedAtMs) {
+            return false;
+          }
+          return true;
+        })
+        .map((e) => ({
+          id: e.id,
+          attempts: Number(e.attempts),
+          durationSec: Number(e.duration_sec),
+          status: e.status,
+          createdAt:
+            e.created_at instanceof Date
+              ? e.created_at.toISOString()
+              : String(e.created_at),
+        }));
+      const alert = evaluateStudent(activeAlertEvents);
 
       let paceBand: PaceBand = session ? sessionBand(session).band : "on";
       if (paceBand === "behind" && ivResolved && struggleEvents.length <= 1) {
@@ -427,6 +462,7 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
         currentLessonTitle: activeLessonTitle,
         equipped: equippedByStudent.get(stu.id) ?? {},
         interventionStatus,
+        alert,
         creditsEarned,
         creditTarget,
       };

@@ -50,15 +50,15 @@ Tracked in Linear (`weaver-edu` / **WVR** / **Weavr Clean Rebuild**). One commit
 - [x] Verify, commit, push, update **WVR-239**
 
 ## Task 7: WVR-241 — Core demo loop: teacher identifies a struggling student and addresses it
-- [ ] Create `src/domain/alerts/rules.ts` (`evaluateStudent`, minimal Phase 4 WP-E2 slice using `weaverConfig.alerts`)
-- [ ] Compute `alert?: StudentAlert | null` per student in `getRoomSnapshot()` (`src/lib/room/data.ts`), clearing struggle alert when `interventionStatus === "resolved"` and surfacing `fast_student` when `alerts.fastStudentNotice` is true
-- [ ] Add visible-tab polling (`alerts.latencyTargetMs`) to `RoomStage.tsx`
-- [ ] Create `src/components/room/AlertMark.tsx` and render on Galaxy node (`GalaxyHome.tsx`) and Swimlane row (`PacingTable.tsx`)
-- [ ] Handle `?alert=<blockEventId>` in `StudentProfileRoom.tsx` to preselect & highlight flagged node (`data-flagged="true"`) on `MasteryChart.tsx` and open/trigger offline intervention drawer
-- [ ] Add unit tests (`alerts-rules.test.ts`), component check, and golden-path E2E spec `e2e/core-demo-loop.spec.ts`
-- [ ] Verify, commit, push, update **WVR-241**
+- [x] Create `src/domain/alerts/rules.ts` (`evaluateStudent`, minimal Phase 4 WP-E2 slice using `weaverConfig.alerts`)
+- [x] Compute `alert?: StudentAlert | null` per student in `getRoomSnapshot()` (`src/lib/room/data.ts`), clearing struggle alert when `interventionStatus === "resolved"` and surfacing `fast_student` when `alerts.fastStudentNotice` is true
+- [x] Add visible-tab polling (`alerts.latencyTargetMs`) to `RoomStage.tsx`
+- [x] Create `src/components/room/AlertMark.tsx` and render on Galaxy node (`GalaxyHome.tsx`) and Swimlane row (`PacingTable.tsx`)
+- [x] Handle `?alert=<blockEventId>` in `StudentProfileRoom.tsx` to preselect & highlight flagged node (`data-flagged="true"`) on `MasteryChart.tsx` and open/trigger offline intervention drawer
+- [x] Add unit tests (`alerts-rules.test.ts`), component check, and golden-path E2E spec `e2e/core-demo-loop.spec.ts`
+- [x] Verify, commit, push, update **WVR-241**
 
 ## Final Checkpoint
-- [ ] Full `verify:all` pass (env, migrations, PGlite RLS, typecheck, unit tests, production build, all Playwright E2E specs)
-- [ ] Verify all 7 Linear issues match §9 checklist
-- [ ] Deliver concise QA test checklist for Jah
+- [x] Full `verify:all` pass (env, migrations, PGlite RLS, typecheck, unit tests, production build, all Playwright E2E specs)
+- [x] Verify all 7 Linear issues match §9 checklist
+- [x] Deliver concise QA test checklist for Jah

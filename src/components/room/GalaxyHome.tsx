@@ -19,6 +19,7 @@ import { StudentAvatarHalo } from "@/components/avatars/StudentAvatar";
 import { nodeLook } from "@/lib/avatars/look";
 import type { EquippedLoadout } from "@/lib/collectibles/catalog";
 import type { RoomPack, RoomStudent } from "@/lib/room/types";
+import { AlertMark } from "./AlertMark";
 import { GalaxyField } from "./GalaxyField";
 import {
   placePopover,
@@ -114,40 +115,49 @@ function DraggableStudentNode({
         onMouseLeave={onHoverEnd}
         onPointerDownCapture={() => onPointerDown(student)}
       >
-        <Link
-          href={`/students/${student.id}`}
-          aria-label={`Open ${student.firstName}'s profile`}
-          draggable={false}
-          onDragStart={(e) => e.preventDefault()}
-          className="flex flex-col items-center"
-        >
-          <div
-            className="wv-node-bob"
-            style={{
-              animationDuration: `${5.4 + (index % 4) * 0.4}s`,
-              animationDelay: `${(index % 6) * 0.35}s`,
-            }}
-          >
-            <StudentAvatarHalo
-              seed={student.id}
-              look={look}
-              equipped={student.equipped ?? {}}
-              ringColor={packColor}
-              blinkDelay={blinkDelay}
+        <div className="relative flex flex-col items-center">
+          {student.alert && (
+            <AlertMark
+              studentId={student.id}
+              alert={student.alert}
+              className="absolute -right-1 -top-1 z-10"
             />
-            <span className="wv-node-name">{student.firstName}</span>
-            {student.paceBand === "ahead" && (
-              <span className="wv-node-pace" data-pace="fast">
-                Fast
-              </span>
-            )}
-            {student.paceBand === "behind" && (
-              <span className="wv-node-pace" data-pace="slow">
-                Slow
-              </span>
-            )}
-          </div>
-        </Link>
+          )}
+          <Link
+            href={`/students/${student.id}`}
+            aria-label={`Open ${student.firstName}'s profile`}
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+            className="flex flex-col items-center"
+          >
+            <div
+              className="wv-node-bob"
+              style={{
+                animationDuration: `${5.4 + (index % 4) * 0.4}s`,
+                animationDelay: `${(index % 6) * 0.35}s`,
+              }}
+            >
+              <StudentAvatarHalo
+                seed={student.id}
+                look={look}
+                equipped={student.equipped ?? {}}
+                ringColor={packColor}
+                blinkDelay={blinkDelay}
+              />
+              <span className="wv-node-name">{student.firstName}</span>
+              {student.paceBand === "ahead" && (
+                <span className="wv-node-pace" data-pace="fast">
+                  Fast
+                </span>
+              )}
+              {student.paceBand === "behind" && (
+                <span className="wv-node-pace" data-pace="slow">
+                  Slow
+                </span>
+              )}
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   );
