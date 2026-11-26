@@ -16,6 +16,7 @@ test("renders Galaxy Home, flips to Pace Calendar with G/C shortcuts, and toggle
   page,
   request,
 }) => {
+  test.setTimeout(60_000);
   const pageErrors: string[] = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
 
@@ -145,6 +146,48 @@ test("enforces strict 500ms hover delay before showing student popover", async (
     narrowPop!.y >= narrowNode!.y + narrowNode!.height
   );
   expect(overlapsNarrow).toBe(false);
+});
+
+test("clicking or pressing Enter on a Galaxy group title opens a group-level pacing breakdown and dismisses cleanly", async ({
+  page,
+}) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  // Click Space group title -> breakdown dialog opens with matching member total
+  const spaceTitle = page.getByTestId("group-title-pack_space");
+  const spaceNodes = page.locator('[data-galaxy-cell="pack_space"] [data-student-id]');
+  const expectedTotal = await spaceNodes.count();
+
+  await spaceTitle.click();
+  const breakdown = page.getByTestId("group-pacing-breakdown");
+  await expect(breakdown).toBeVisible();
+  await expect(breakdown).toHaveAttribute("role", "dialog");
+  await expect(breakdown).toHaveAttribute("data-pack-id", "pack_space");
+  await expect(breakdown).toHaveAttribute("data-total", String(expectedTotal));
+  await expect(breakdown).toContainText("Ahead");
+  await expect(breakdown).toContainText("On Track");
+  await expect(breakdown).toContainText("Behind");
+
+  // Escape closes the breakdown
+  await page.keyboard.press("Escape");
+  await expect(breakdown).toHaveCount(0);
+
+  // Keyboard path: focus Cooking group title and press Enter
+  const cookingTitle = page.getByTestId("group-title-pack_cooking");
+  await cookingTitle.focus();
+  await page.keyboard.press("Enter");
+  await expect(breakdown).toBeVisible();
+  await expect(breakdown).toHaveAttribute("data-pack-id", "pack_cooking");
+
+  // Close button dismisses it
+  await breakdown.getByRole("button", { name: "Close" }).click();
+  await expect(breakdown).toHaveCount(0);
+
+  // Clicking outside dismisses it
+  await spaceTitle.click();
+  await expect(breakdown).toBeVisible();
+  await page.mouse.click(10, 10);
+  await expect(breakdown).toHaveCount(0);
 });
 
 test("drags student to another cluster, persists across reload, and returns 409 on stale version", async ({

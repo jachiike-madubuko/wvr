@@ -17,12 +17,12 @@ Tracked in Linear (`weaver-edu` / **WVR** / **Weavr Clean Rebuild**). One commit
 - [x] Verify, commit, push, update **WVR-236**
 
 ## Task 3: WVR-237 — Clicking a Galaxy group title opens a group-level pacing breakdown
-- [ ] Create pure aggregation helper `src/components/room/group-pacing.ts` (`groupPacing`)
-- [ ] Create `src/components/room/GroupPacingBreakdown.tsx` (`role="dialog"`, Esc/Close/outside-click dismiss, band split + urgency-sorted per-student list)
-- [ ] Make `PackCluster` group titles clickable/keyboard-operable `<button>` in `GalaxyHome.tsx` (`onPointerDown` stopPropagation so drag still works)
-- [ ] Add unit test `tests/unit/group-pacing.test.ts`
-- [ ] Extend `e2e/room-first.spec.ts` (click, Esc close, keyboard Tab+Enter, drag still works)
-- [ ] Verify, commit, push, update **WVR-237**
+- [x] Create pure aggregation helper `src/components/room/group-pacing.ts` (`groupPacing`)
+- [x] Create `src/components/room/GroupPacingBreakdown.tsx` (`role="dialog"`, Esc/Close/outside-click dismiss, band split + urgency-sorted per-student list)
+- [x] Make `PackCluster` group titles clickable/keyboard-operable `<button>` in `GalaxyHome.tsx` (`onPointerDown` stopPropagation so drag still works)
+- [x] Add unit test `tests/unit/group-pacing.test.ts`
+- [x] Extend `e2e/room-first.spec.ts` (click, Esc close, keyboard Tab+Enter, drag still works)
+- [x] Verify, commit, push, update **WVR-237**
 
 ## Task 4: WVR-233 (fixture portion only) — Varied weekday demo fixtures & Swimlane offsets
 - [ ] Extend `src/lib/demo/seed.ts` with deterministic UUIDv5 weekday lesson blocks (`CURRENT_DATE`-anchored, past+today only), per-student per-day dwell profiles, keep-list updates, and varied Swimlane event inputs (keep Maya, keep layouts/labels)

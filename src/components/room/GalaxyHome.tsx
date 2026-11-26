@@ -25,6 +25,8 @@ import {
   type Placement,
   type Rect,
 } from "./galaxy-popover-position";
+import { groupPacing } from "./group-pacing";
+import { GroupPacingBreakdown } from "./GroupPacingBreakdown";
 
 export const OPEN_DELAY_MS = 500;
 export const CLOSE_DELAY_MS = 100;
@@ -153,25 +155,35 @@ function DraggableStudentNode({
 
 function PackCluster({
   pack,
+  packIndex,
   members,
   activeStudent,
   isPaused,
+  isBreakdownOpen,
+  onToggleBreakdown,
+  onCloseBreakdown,
   onHoverStart,
   onHoverEnd,
   onPointerDown,
 }: {
   pack: RoomPack;
+  packIndex: number;
   members: StudentWithEquipped[];
   activeStudent: StudentWithEquipped | null;
   isPaused: boolean;
+  isBreakdownOpen: boolean;
+  onToggleBreakdown: () => void;
+  onCloseBreakdown: () => void;
   onHoverStart: (student: RoomStudent, el: HTMLElement) => void;
   onHoverEnd: () => void;
   onPointerDown: (student: RoomStudent) => void;
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const { setNodeRef, isOver } = useDroppable({ id: pack.id });
   const isTarget =
     activeStudent !== null && isOver && activeStudent.packId !== pack.id;
   const orbitRadius = Math.min(104, Math.max(70, 24 * members.length));
+  const pacingData = isBreakdownOpen ? groupPacing(members, pack.id) : null;
 
   return (
     <section
@@ -188,17 +200,41 @@ function PackCluster({
         } as CSSProperties
       }
     >
-      <div className="z-[1] flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-1.5">
-        <span
-          className="inline-block h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: pack.color }}
-        />
-        <span
-          className="text-sm font-bold text-[#f6f1ea]"
-          style={{ fontFamily: "var(--font-serif-display)" }}
+      <div
+        className={`relative flex flex-col items-center ${isBreakdownOpen ? "z-30" : "z-[1]"}`}
+      >
+        <button
+          ref={triggerRef}
+          type="button"
+          data-testid={`group-title-${pack.id}`}
+          aria-expanded={isBreakdownOpen}
+          aria-controls={`group-pacing-${pack.id}`}
+          onClick={onToggleBreakdown}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-black/35 px-4 py-1.5 transition-colors hover:border-white/25 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#58b6fa]"
         >
-          {pack.label}
-        </span>
+          <span
+            className="inline-block h-2.5 w-2.5 rounded-full"
+            style={{ backgroundColor: pack.color }}
+          />
+          <span
+            className="text-sm font-bold text-[#f6f1ea]"
+            style={{ fontFamily: "var(--font-serif-display)" }}
+          >
+            {pack.label}
+          </span>
+        </button>
+
+        {isBreakdownOpen && pacingData && (
+          <GroupPacingBreakdown
+            id={`group-pacing-${pack.id}`}
+            pack={pack}
+            data={pacingData}
+            openUpward={packIndex >= 3}
+            triggerRef={triggerRef}
+            onClose={onCloseBreakdown}
+          />
+        )}
       </div>
 
       <div className="wv-orbit-nodes">
@@ -236,6 +272,7 @@ export function GalaxyHome({
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [popover, setPopover] = useState<PopoverState | null>(null);
+  const [openPackId, setOpenPackId] = useState<string | null>(null);
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
   const [pointerDownPackId, setPointerDownPackId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -333,6 +370,7 @@ export function GalaxyHome({
   const handleDragStart = (event: DragStartEvent) => {
     clearTimers();
     setPopover(null);
+    setOpenPackId(null);
     setActiveStudentId(String(event.active.id));
   };
 
@@ -387,16 +425,27 @@ export function GalaxyHome({
         onDragCancel={handleDragCancel}
       >
         <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-3 sm:gap-4 lg:grid-cols-3">
-          {packs.map((pack) => (
+          {packs.map((pack, packIndex) => (
             <PackCluster
               key={pack.id}
               pack={pack}
+              packIndex={packIndex}
               members={students.filter((s) => s.packId === pack.id)}
               activeStudent={activeStudent}
               isPaused={
                 popover?.student.packId === pack.id ||
+                openPackId === pack.id ||
                 activeStudentId !== null ||
                 pointerDownPackId === pack.id
+              }
+              isBreakdownOpen={openPackId === pack.id}
+              onToggleBreakdown={() => {
+                clearTimers();
+                setPopover(null);
+                setOpenPackId((cur) => (cur === pack.id ? null : pack.id));
+              }}
+              onCloseBreakdown={() =>
+                setOpenPackId((cur) => (cur === pack.id ? null : cur))
               }
               onHoverStart={scheduleOpen}
               onHoverEnd={scheduleClose}
