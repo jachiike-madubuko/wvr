@@ -1,4 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
+import { MasteryChart } from "@/components/room/profile/MasteryChart";
 import {
   buildCheckInSeries,
   buildMasteryNodes,
@@ -111,4 +114,46 @@ test("validateThreadRequest blocks PII via scanForPii and accepts clean teacher 
     message: "Check in softly at the door tomorrow morning.",
   });
   expect(clean.ok).toBe(true);
+});
+
+test("MasteryChart omits redundant pill button row and renders focusable SVG hit points", () => {
+  const html = renderToStaticMarkup(
+    createElement(MasteryChart, {
+      events: [
+        {
+          id: "ev-1",
+          blockId: "hook",
+          subject: "hook",
+          attempts: 1,
+          durationSec: 95,
+          status: "completed",
+          errorLog: [],
+          createdAt: "2026-11-23T15:00:00Z",
+        },
+        {
+          id: "ev-2",
+          blockId: "math",
+          subject: "math",
+          attempts: 4,
+          durationSec: 240,
+          status: "struggling",
+          errorLog: ["unequal parts"],
+          createdAt: "2026-11-23T15:10:00Z",
+        },
+      ],
+      zoom: "day",
+      filter: "both",
+      onZoom: () => {},
+      onFilter: () => {},
+      onSelectNode: () => {},
+    }),
+  );
+
+  // Pill buttons under the chart must not render
+  expect(html).not.toMatch(/<button[^>]*data-testid="mastery-node-/);
+  expect(html).not.toContain("hook (hook) · 95s");
+  // SVG hit points carry testid, role="button", and tabindex="0"
+  expect(html).toContain('data-testid="mastery-node-ev-1"');
+  expect(html).toContain('data-testid="mastery-node-ev-2"');
+  expect(html).toMatch(/<circle[^>]*role="button"[^>]*tabindex="0"[^>]*data-testid="mastery-node-ev-2"/);
 });

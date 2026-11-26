@@ -85,8 +85,27 @@ test("renders Maya profile with Bklit Weaver Wheel, Check-ins, Mastery chart, an
   await drawer.getByRole("button", { name: "Close" }).click();
   await expect(drawer).toHaveCount(0);
 
-  // Click red struggle node -> 3-Step Offline Intervention Drawer & Approve
-  const struggleNode = page.locator('[data-testid^="mastery-node-"][data-kind="struggle"]').first();
+  // Redundant pill label row under the Mastery chart is removed; hit points live inside the SVG
+  await expect(
+    page.locator('[data-testid="mastery-chart"] button[data-testid^="mastery-node-"]'),
+  ).toHaveCount(0);
+
+  const struggleNode = page
+    .locator('[data-testid="mastery-chart"] svg [data-testid^="mastery-node-"][data-kind="struggle"]')
+    .first();
+  await expect(struggleNode).toHaveAttribute("role", "button");
+  await expect(struggleNode).toHaveAttribute("tabindex", "0");
+
+  // Keyboard path: focus hit point -> tooltip appears -> Enter opens coaching drawer
+  await struggleNode.focus();
+  await expect(page.getByTestId("mastery-chart")).toContainText("tries");
+  await page.keyboard.press("Enter");
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("unequal parts");
+  await drawer.getByRole("button", { name: "Close" }).click();
+  await expect(drawer).toHaveCount(0);
+
+  // Pointer click on red struggle hit point -> 3-Step Offline Intervention Drawer & Approve
   await struggleNode.click();
   await expect(drawer).toBeVisible();
   await expect(drawer).toContainText("unequal parts");

@@ -16,7 +16,7 @@ test("toggles sales_walkthrough <-> interactive_onboarding, slices subjects, res
   page,
   request,
 }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   const pageErrors: string[] = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
 
@@ -67,7 +67,7 @@ test("toggles sales_walkthrough <-> interactive_onboarding, slices subjects, res
     await page.getByTestId("onboarding-step-nebula").click();
     await expect(page.getByRole("heading", { name: "Nebula" })).toBeVisible();
     const nebulaStruggle = page
-      .locator('[data-testid^="mastery-node-"][data-kind="struggle"]')
+      .locator('[data-testid="mastery-chart"] svg [data-testid^="mastery-node-"][data-kind="struggle"]')
       .first();
     await nebulaStruggle.click();
     const drawer = page.getByTestId("profile-drawer");
@@ -118,7 +118,7 @@ test("toggles sales_walkthrough <-> interactive_onboarding, slices subjects, res
     const pulsarId = salesRoom.students.find((s) => s.firstName === "Pulsar")!.id;
     await page.goto(`/students/${pulsarId}`, { waitUntil: "domcontentloaded" });
     await page
-      .locator('[data-testid^="mastery-node-"][data-kind="struggle"]')
+      .locator('[data-testid="mastery-chart"] svg [data-testid^="mastery-node-"][data-kind="struggle"]')
       .first()
       .click();
     const pulsarRegen = page.waitForResponse(

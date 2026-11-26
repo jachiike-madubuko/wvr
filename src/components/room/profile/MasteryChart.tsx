@@ -138,39 +138,22 @@ export function MasteryChart({
               }}
             />
             <ChartHitPoints
-              items={rows.map((r) => ({
+              items={rows.map((r, idx) => ({
                 id: r.node.id,
+                testId: `mastery-node-${r.node.id}`,
+                dataIndex: idx,
                 date: r.date,
                 y: r.node.durationSec,
                 color: r.node.kind === "struggle" ? CORAL : MINT,
                 radius: r.node.dimmed ? 3 : r.node.kind === "struggle" ? 7 : 5,
                 opacity: r.node.dimmed ? 0.25 : 1,
-                ariaLabel: r.node.label,
+                ariaLabel: `${r.node.label}, ${r.node.attempts} tries, ${r.node.durationSec}s`,
                 kind: r.node.kind,
                 payload: r.node,
               }))}
               onSelect={onSelectNode}
             />
           </LineChart>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {nodes.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                data-testid={`mastery-node-${n.id}`}
-                data-kind={n.kind}
-                onClick={() => onSelectNode(n)}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                  n.kind === "struggle"
-                    ? "border-[#f87171]/40 bg-[#f87171]/15 text-[#f87171]"
-                    : "border-[#48e29a]/30 bg-[#48e29a]/10 text-[#48e29a]"
-                }`}
-              >
-                {n.label} · {n.durationSec}s
-              </button>
-            ))}
-          </div>
         </>
       )}
     </div>
