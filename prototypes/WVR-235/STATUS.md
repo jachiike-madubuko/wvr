@@ -1,10 +1,10 @@
 ---
 issue_id: WVR-235
 issue_link: "https://linear.app/weaver-edu/issue/WVR-235/weaver-wheel-teacher-input-ui"
-stage: stories
+stage: redteam
 round: 0
-waiting_on: Petey Pablo
-updated: "2026-11-26 06:02 MST (America/Denver)"
+waiting_on: WVR.dev
+updated: "2026-11-26 06:09 MST (America/Denver)"
 ---
 
 # WVR-235
