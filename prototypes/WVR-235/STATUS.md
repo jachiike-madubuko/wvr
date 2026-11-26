@@ -1,10 +1,10 @@
 ---
 issue_id: WVR-235
 issue_link: "https://linear.app/weaver-edu/issue/WVR-235/weaver-wheel-teacher-input-ui"
-stage: build
+stage: test
 round: 1
-waiting_on: WVR.dev
-updated: "2026-11-26 06:27 MST (America/Denver)"
+waiting_on: Sequoia
+updated: "2026-11-26 06:31 MST (America/Denver)"
 ---
 
 # WVR-235
