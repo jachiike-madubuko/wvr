@@ -20,6 +20,12 @@ const BLUE = "#58b6fa";
 const MINT = "#48e29a";
 const CORAL = "#f87171";
 
+function formatNodeTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 export function MasteryChart({
   events,
   zoom,
@@ -42,12 +48,18 @@ export function MasteryChart({
 
   const rows = useMemo(
     () =>
-      nodes.map((n, idx) => ({
-        date: new Date(2026, 10, 20 + idx),
-        label: n.label,
-        value: n.durationSec,
-        node: n,
-      })),
+      nodes.map((n, idx) => {
+        const parsed = new Date(n.at);
+        const date = Number.isNaN(parsed.getTime())
+          ? new Date(2026, 10, 20 + idx)
+          : parsed;
+        return {
+          date,
+          label: n.label,
+          value: n.durationSec,
+          node: n,
+        };
+      }),
     [nodes],
   );
 
@@ -129,6 +141,11 @@ export function MasteryChart({
                         color: n.kind === "struggle" ? CORAL : MINT,
                         label: "Duration",
                         value: `${n.durationSec}s · ${n.attempts} tries`,
+                      },
+                      {
+                        color: BLUE,
+                        label: "Time",
+                        value: formatNodeTime(n.at),
                       },
                     ]}
                   >

@@ -66,12 +66,16 @@ export function BlockFlip({
   initialCompletedIds,
   roster,
   initialCollectiblesByStudent,
+  simulationEnabled = false,
+  demoStudentIds,
 }: {
   token: string;
   payload: RawPathPayload;
   initialCompletedIds: string[];
   roster: StudentRosterItem[];
   initialCollectiblesByStudent?: Record<string, StudentCollectiblesBundle>;
+  simulationEnabled?: boolean;
+  demoStudentIds?: string[];
 }) {
   const deck = useMemo(() => buildMosaicDeck(payload), [payload]);
   const [student, setStudent] = useState<StudentRosterItem | null>(null);
@@ -83,6 +87,8 @@ export function BlockFlip({
   >(() => initialCollectiblesByStudent ?? {});
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [unlockToast, setUnlockToast] = useState<CollectibleItem | null>(null);
+  const [simBusy, setSimBusy] = useState(false);
+  const [simToast, setSimToast] = useState<string | null>(null);
 
   // Flip & tile feedback state
   const [flip, setFlip] = useState<FlipState | null>(null);
@@ -361,6 +367,46 @@ export function BlockFlip({
     }
   };
 
+  const showSimulationControls =
+    simulationEnabled &&
+    Boolean(student) &&
+    (!demoStudentIds || (student ? demoStudentIds.includes(student.id) : false));
+
+  const runSimulation = async (kind: "fast" | "struggling") => {
+    if (!student || simBusy) return;
+    setSimBusy(true);
+    setSimToast(null);
+    try {
+      const res = await fetch("/api/demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "simulate",
+          kind,
+          studentId: student.id,
+          token,
+        }),
+      });
+      if (res.ok) {
+        const json = (await res.json()) as {
+          result?: { completedBlockIds?: string[] };
+        };
+        if (Array.isArray(json.result?.completedBlockIds)) {
+          setCompletedIds(json.result.completedBlockIds);
+        }
+        setSimToast(
+          `Simulated ${kind} student for ${student.firstName}. Open their profile to see it.`,
+        );
+      } else {
+        setSimToast("Simulation failed.");
+      }
+    } catch {
+      setSimToast("Simulation failed.");
+    } finally {
+      setSimBusy(false);
+    }
+  };
+
   if (!student) {
     return (
       <main
@@ -484,7 +530,29 @@ export function BlockFlip({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {showSimulationControls && (
+              <div
+                className="flex flex-wrap items-center gap-1.5"
+                role="group"
+                aria-label="Demo simulation"
+              >
+                {(["fast", "struggling"] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    data-testid={`simulate-${kind}`}
+                    disabled={simBusy}
+                    onClick={() => void runSimulation(kind)}
+                    className="rounded-full border border-dashed border-white/25 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold text-[#cbd5e1] transition-colors hover:border-white/40 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#58b6fa] disabled:opacity-45"
+                  >
+                    {kind === "fast"
+                      ? "Simulate fast student"
+                      : "Simulate struggling student"}
+                  </button>
+                ))}
+              </div>
+            )}
             {token === "demo-space-lesson" && (
               <Link
                 href="/"
@@ -500,6 +568,7 @@ export function BlockFlip({
                 setStudent(null);
                 setFlip(null);
                 setUnlockToast(null);
+                setSimToast(null);
               }}
               className="rounded-full border border-white/15 px-3.5 py-1.5 text-xs font-semibold text-[#cbd5e1] hover:bg-white/10"
             >
@@ -507,6 +576,32 @@ export function BlockFlip({
             </button>
           </div>
         </header>
+
+        {simToast && (
+          <div
+            data-testid="sim-toast"
+            role="status"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-[#58b6fa]/40 bg-[#58b6fa]/10 px-4 py-2.5 text-xs text-[#e2e8f0]"
+          >
+            <span>{simToast}</span>
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/students/${student.id}`}
+                className="rounded-full border border-[#58b6fa]/40 bg-[#58b6fa]/15 px-2.5 py-1 text-[11px] font-semibold text-[#93c5fd] hover:bg-[#58b6fa]/25"
+              >
+                Open profile ↗
+              </Link>
+              <button
+                type="button"
+                aria-label="Dismiss simulation notice"
+                onClick={() => setSimToast(null)}
+                className="rounded-lg px-2 py-0.5 text-xs text-[#cbd5e1] hover:bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Blocks / Inventory Tabs */}
         <nav

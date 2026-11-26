@@ -6,13 +6,17 @@ import {
   isDemoProfile,
   seedDemoProfile,
 } from "@/lib/demo/seed";
+import { runDemoSimulation, type SimKind } from "@/lib/demo/simulate";
 import { getRoomSnapshot } from "@/lib/room/data";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type DemoRequest =
   | { action: "switch" | "reset"; profile: "sales_walkthrough" | "interactive_onboarding" }
-  | { action: "clear" };
+  | { action: "clear" }
+  | { action: "simulate"; kind: SimKind; studentId: string; token: string };
 
 function parseDemoRequest(input: unknown): DemoRequest | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
@@ -23,6 +27,22 @@ function parseDemoRequest(input: unknown): DemoRequest | null {
     isDemoProfile(raw.profile)
   ) {
     return { action: raw.action, profile: raw.profile };
+  }
+  if (
+    raw.action === "simulate" &&
+    (raw.kind === "fast" || raw.kind === "struggling") &&
+    typeof raw.studentId === "string" &&
+    UUID_RE.test(raw.studentId) &&
+    typeof raw.token === "string" &&
+    raw.token.trim().length > 0 &&
+    raw.token.length <= 200
+  ) {
+    return {
+      action: "simulate",
+      kind: raw.kind,
+      studentId: raw.studentId,
+      token: raw.token.trim(),
+    };
   }
   return null;
 }
@@ -65,6 +85,20 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (parsed.action === "simulate") {
+      const result = await withUnpooledAdminDb(
+        (client) =>
+          runDemoSimulation(client, {
+            kind: parsed.kind,
+            studentId: parsed.studentId,
+            plainToken: parsed.token,
+            teacherId: env.teacherId,
+          }),
+        env.directUrl,
+      );
+      return NextResponse.json({ ok: true, result });
+    }
+
     const result = await withUnpooledAdminDb(async (client) => {
       if (parsed.action === "clear") {
         return clearDemoData(client, { teacherId: env.teacherId });
@@ -78,9 +112,9 @@ export async function POST(request: Request) {
     const room = await getRoomSnapshot();
     return NextResponse.json({ ok: true, result, room });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "DEMO_MUTATION_FAILED" },
-      { status: 500 },
-    );
+    const message =
+      err instanceof Error ? err.message : "DEMO_MUTATION_FAILED";
+    const status = message === "SIMULATION_NOT_DEMO" ? 403 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

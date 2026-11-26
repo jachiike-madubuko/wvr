@@ -59,6 +59,7 @@ export type MasteryNode = {
   kind: "strength" | "struggle";
   misconception: string | null;
   dimmed: boolean;
+  at: string; // ISO timestamp (day zoom) or bucket date (week/month zoom)
 };
 
 export type ActionThreadMessage = {
@@ -182,6 +183,7 @@ export function buildMasteryNodes(
       kind,
       misconception: ev.errorLog[0] ?? (isStruggle ? "Needs offline scaffolding" : null),
       dimmed,
+      at: ev.createdAt,
     };
   });
 
@@ -217,6 +219,7 @@ export function buildMasteryNodes(
       kind,
       misconception: struggle?.errorLog[0] ?? null,
       dimmed,
+      at: zoom === "week" ? `${key}T12:00:00Z` : `${key}-01T12:00:00Z`,
     };
   });
 }

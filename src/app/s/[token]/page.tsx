@@ -1,4 +1,5 @@
 import { BlockFlip } from "@/components/student-path/BlockFlip";
+import { getDemoSimulationContext } from "@/lib/demo/simulate-gate";
 import { openStudentPath } from "@/lib/student-path/data";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,10 @@ export default async function StudentPathPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const data = await openStudentPath(token);
+  const [data, simContext] = await Promise.all([
+    openStudentPath(token),
+    getDemoSimulationContext(token),
+  ]);
 
   if (!data) {
     return (
@@ -32,6 +36,8 @@ export default async function StudentPathPage({
       initialCompletedIds={data.progress.completedBlockIds ?? []}
       roster={data.roster}
       initialCollectiblesByStudent={data.collectiblesByStudent}
+      simulationEnabled={simContext.enabled}
+      demoStudentIds={simContext.demoStudentIds}
     />
   );
 }

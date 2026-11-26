@@ -41,13 +41,13 @@ Tracked in Linear (`weaver-edu` / **WVR** / **Weavr Clean Rebuild**). One commit
 - [x] Verify, commit, push, update **WVR-238**
 
 ## Task 6: WVR-239 — Simulate fast & struggling students on `/s/[token]` (Demo Data Mode, revertible, live Mastery chart)
-- [ ] Create `src/lib/demo/simulate.ts` (`generateSimulation`) driven by `weaverConfig`
-- [ ] Create server-only `src/lib/demo/simulate-gate.ts` (`isDemoSimulationEnabled`)
-- [ ] Extend `src/app/api/demo/route.ts` with `action: "simulate"` (reusing `assertSafeDemoEnv`, `withUnpooledAdminDb`, `is_demo = true`, `block_events` + `student_path_sessions` + `demo.simulation_run`)
-- [ ] Pass `simulationEnabled` from `src/app/s/[token]/page.tsx` to `BlockFlip.tsx`; render secondary dashed "Simulate fast student" & "Simulate struggling student" buttons next to Home / Switch
-- [ ] Add live polling (`alerts.latencyTargetMs`, visible-tab + focus) to `StudentProfileRoom.tsx` and plot real `created_at` timestamps on `MasteryChart.tsx` / `LineChart.tsx`
-- [ ] Add unit tests (`simulate.test.ts`), DB/API tests, and E2E spec `e2e/demo-simulation.spec.ts`
-- [ ] Verify, commit, push, update **WVR-239**
+- [x] Create `src/lib/demo/simulate.ts` (`generateSimulation`) driven by `weaverConfig`
+- [x] Create server-only `src/lib/demo/simulate-gate.ts` (`isDemoSimulationEnabled`)
+- [x] Extend `src/app/api/demo/route.ts` with `action: "simulate"` (reusing `assertSafeDemoEnv`, `withUnpooledAdminDb`, `is_demo = true`, `block_events` + `student_path_sessions` + `demo.simulation_run`)
+- [x] Pass `simulationEnabled` from `src/app/s/[token]/page.tsx` to `BlockFlip.tsx`; render secondary dashed "Simulate fast student" & "Simulate struggling student" buttons next to Home / Switch
+- [x] Add live polling (`alerts.latencyTargetMs`, visible-tab + focus) to `StudentProfileRoom.tsx` and plot real `created_at` timestamps on `MasteryChart.tsx` / `LineChart.tsx`
+- [x] Add unit tests (`simulate.test.ts`), DB/API tests, and E2E spec `e2e/demo-simulation.spec.ts`
+- [x] Verify, commit, push, update **WVR-239**
 
 ## Task 7: WVR-241 — Core demo loop: teacher identifies a struggling student and addresses it
 - [ ] Create `src/domain/alerts/rules.ts` (`evaluateStudent`, minimal Phase 4 WP-E2 slice using `weaverConfig.alerts`)

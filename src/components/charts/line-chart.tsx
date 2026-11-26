@@ -86,13 +86,15 @@ export function LineChart({
           const innerHeight = Math.max(h - DEFAULT_MARGIN.top - DEFAULT_MARGIN.bottom, 20);
 
           const dates = data.map((row, idx) => toDate(row[xDataKey], idx));
-          const minDate = dates[0] ?? new Date(2026, 9, 26);
-          const maxDate =
-            dates.length > 1
-              ? dates[dates.length - 1]!
-              : new Date(minDate.getTime() + 86_400_000);
+          const times = dates.map((d) => d.getTime());
+          const minMs =
+            times.length > 0 ? Math.min(...times) : new Date(2026, 9, 26).getTime();
+          const rawMaxMs = times.length > 0 ? Math.max(...times) : minMs;
+          const maxMs = rawMaxMs > minMs ? rawMaxMs : minMs + 60_000;
 
-          const xScale = scaleTime().domain([minDate, maxDate]).range([0, innerWidth]);
+          const xScale = scaleTime()
+            .domain([new Date(minMs), new Date(maxMs)])
+            .range([0, innerWidth]);
           const maxY = yScaleDomainMax ?? 1;
           const yScale = scaleLinear().domain([0, maxY]).range([innerHeight, 0]);
 

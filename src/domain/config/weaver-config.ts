@@ -17,7 +17,19 @@ export const weaverConfig = {
   },
 } as const;
 
-export type AlertsConfig = typeof weaverConfig.alerts;
+export type AlertsConfig = {
+  readonly idleSec: number;
+  readonly fastSec: number;
+  readonly overTimeSec: number;
+  readonly highAttempts: number;
+  readonly latencyTargetMs: number;
+  readonly fastStudentNotice: boolean;
+};
+
+export type DemoSimulationConfig = {
+  readonly strugglingExampleAttempts: number;
+  readonly strugglingSubject: string;
+};
 
 export function isStruggleEvent(
   ev: { status: string; attempts: number; durationSec: number },
