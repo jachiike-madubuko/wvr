@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>WVR-235 · v3 · Wizard</title>
+<style>
+:root{--bg:#0b1020;--panel:#111728;--text:#f6f1ea;--muted:#8892b0;--accent:#58b6fa;--err:#ff7a7a;--line:rgba(255,255,255,.1);--focus:#ffd479}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.45;font-size:16px;
+  padding:calc(8px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));overflow-wrap:anywhere}
+.wrap{max-width:480px;margin:0 auto}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.muted{color:var(--muted)}.small{font-size:.85rem}
+.top{display:flex;align-items:center;gap:8px;padding:4px 0 10px}
+.back{color:var(--accent);text-decoration:none;min-height:44px;min-width:44px;display:inline-flex;align-items:center;font-size:.9rem;white-space:nowrap}
+.who{flex:1;min-width:0}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.name{font-weight:800;font-size:1.15rem}
+.tag{font-size:.7rem;border:1px solid var(--line);border-radius:999px;padding:1px 6px;color:var(--muted);white-space:nowrap}
+.room{font-size:.8rem;color:var(--muted);white-space:nowrap}
+.pill{min-height:44px;min-width:44px;padding:0 12px;border-radius:999px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:.8rem;font-weight:700;white-space:nowrap}
+.banner{display:flex;width:100%;align-items:flex-start;gap:8px;text-align:left;background:rgba(255,255,255,.03);border:1px dashed var(--line);border-radius:14px;padding:10px 12px;min-height:44px;color:var(--muted);font-size:.8rem}
+.banner .banner-text{flex:1;min-width:0}
+.banner strong{color:var(--text)}
+.banner[aria-expanded="false"] .banner-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner-tog{color:var(--accent);font-weight:700;white-space:nowrap}
+.tests{font-size:.8rem;color:var(--muted);margin:8px 2px 12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:16px}
+.panel-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+h1{font-size:1.2rem;letter-spacing:-.01em}
+.legend{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.legend .sw{width:14px;height:10px;border:2px solid var(--accent);background:rgba(88,182,250,.35);border-radius:2px}
+.btn{min-height:44px;min-width:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);font-weight:700}
+.btn.primary{background:var(--accent);color:#082033;border-color:var(--accent)}
+.btn[disabled],.btn[aria-disabled="true"]{opacity:.45}
+.btn.block{display:block;width:100%;margin-top:12px}
+.row2{display:flex;gap:8px;margin-top:8px}
+.notice{border:1px solid var(--accent);border-radius:14px;padding:12px;margin-bottom:12px;font-size:.9rem}
+.loading,.loaderr{text-align:center;padding:16px 0;color:var(--muted)}
+.skel{width:200px;max-width:100%;display:block;margin:0 auto 12px;fill:none;stroke:rgba(255,255,255,.12);stroke-width:2}
+.loaderr p{color:var(--text);margin-bottom:12px}
+.bang{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--err);color:#200;align-items:center;justify-content:center;font-weight:900;font-size:.85rem;margin-right:4px}
+.radar-wrap{display:flex;justify-content:center}
+.radar{width:min(100%,280px);height:auto;display:block;overflow:visible}
+.radar .grid{fill:none;stroke:rgba(255,255,255,.1);stroke-width:1}
+.radar .axis{stroke:rgba(255,255,255,.28);stroke-width:1.5}
+.radar .axis.unset{stroke-dasharray:4 4}
+.radar .axis.cur{stroke:var(--text);stroke-width:3.5}
+.radar .lbl{fill:var(--text);font-size:13px}
+.radar .lbl.cur{font-weight:800}
+.radar .lbl .ns{fill:var(--muted);font-size:11px}
+.radar .savedp{fill:rgba(88,182,250,.35);stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round}
+.radar .savedp.faint{fill:rgba(88,182,250,.14);stroke:rgba(88,182,250,.35);stroke-width:1}
+.radar .draftp{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 4;stroke-linejoin:round}
+.radar .vtx{fill:var(--accent)}
+.radar .ring{fill:var(--panel);stroke:var(--muted);stroke-width:2}
+.values{font-size:.85rem;color:var(--muted);text-align:center;margin-top:6px}
+.caption{font-size:.9rem;text-align:center;margin-top:4px}
+.prov{font-size:.8rem;color:var(--muted);text-align:center;margin-top:4px}
+.empty{text-align:center;margin-top:6px}
+.updated{text-align:center;font-size:.85rem;color:var(--muted);margin-top:6px}
+.updated .ok{color:var(--text);font-weight:700}
+.rows{margin-top:16px;display:flex;flex-direction:column;gap:12px}
+.drow{border-top:1px solid var(--line);padding-top:12px}
+.l1{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;column-gap:8px;min-height:44px}
+.l1 .dn{font-weight:800}
+.l1 .rv{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--muted);text-align:right}
+.l1 .rv b{color:var(--text);white-space:nowrap}
+.l1 .rv{margin-left:auto}
+.clear{white-space:nowrap;min-height:44px;min-width:44px;background:none;border:0;color:var(--accent);font-weight:700;text-decoration:underline;padding:0 4px}
+.hint{font-size:.85rem;color:var(--muted);margin-bottom:8px}
+.segs{display:flex;gap:8px}
+.seg{flex:1;min-width:44px;min-height:52px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.05);font-weight:800;font-size:1.05rem}
+.seg[aria-checked="true"]{background:var(--accent);color:#082033;border-color:var(--accent);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+.ends{display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted);margin-top:4px}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#0e1424;border-top:1px solid var(--line);
+  padding:8px calc(16px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+.bar-row{display:flex;align-items:center;gap:8px;max-width:480px;margin:0 auto}
+.bar-err{max-width:480px;margin:0 auto;font-size:.85rem;color:var(--err)}
+.bar-err:empty{display:none}
+.bar-err:not(:empty){margin-bottom:6px}
+.chip{flex:1;display:inline-flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text);visibility:hidden;min-width:0}
+.chip.on{visibility:visible}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:#ffd479;flex:none}
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40}
+.sheet{position:fixed;top:0;left:0;right:0;z-index:41;background:var(--panel);border-bottom:1px solid var(--line);border-radius:0 0 24px 24px;
+  padding:calc(12px + env(safe-area-inset-top)) 16px 16px;max-height:90vh;overflow:auto;max-width:520px;margin:0 auto}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.sheet h2{font-size:1.05rem}
+.tgl{display:flex;align-items:center;gap:10px;min-height:44px;font-size:.95rem}
+.tgl input{width:22px;height:22px;accent-color:var(--accent)}
+.tgl small{color:var(--muted)}
+.ls{border:1px solid var(--line);border-radius:12px;padding:4px 12px 8px;margin:8px 0}
+.ls legend{font-size:.85rem;color:var(--muted);padding:0 4px}
+.ls[disabled]{opacity:.5}
+.sheet-actions{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.foot{text-align:center;font-size:.8rem;color:var(--muted);margin:16px 0 8px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+.card3{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+.prog{font-size:.85rem;color:var(--muted);display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.dots3{display:inline-flex;gap:6px}
+.dot3{width:8px;height:8px;border-radius:50%;border:1px solid var(--muted)}
+.dot3.on{background:var(--text);border-color:var(--text)}
+.nav3{display:flex;justify-content:space-between;gap:8px;margin-top:16px}
+.nav3 .btn{min-width:96px}
+.rev{list-style:none;display:flex;flex-direction:column;gap:8px}
+.revrow{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;font-weight:600}
+.revrow b{color:var(--accent)}
+.radar .lblhit{fill:transparent;cursor:pointer;outline:none}
+.radar .lblhit:focus-visible{stroke:var(--focus);stroke-width:3}
+
+</style>
+</head>
+<body class="variant-v3">
+<div class="wrap">
+  <header class="top">
+    <a href="#" id="backLink" class="back">← Room</a>
+    <div class="who">
+      <p class="eyebrow">WVR-235 · v3 · Wizard</p>
+      <p><span class="name">Tobin</span> <span class="tag">Prototype pseudonym</span> <span class="room">Room 12</span></p>
+    </div>
+    <button type="button" id="pill" class="pill" aria-haspopup="dialog" aria-expanded="false" aria-controls="sheet">Proto controls</button>
+  </header>
+
+  <button type="button" id="banner" class="banner" aria-expanded="true">
+    <span class="banner-text"><strong>Proposed defaults, not decided:</strong> 1–5 scale · partial save allowed · latest value only (no history) · no class average · no question bank.</span>
+    <span class="banner-tog" aria-hidden="true">Hide</span>
+  </button>
+  <p class="tests">Tests: one dimension at a time (Back / Skip·Next / Review), Save on every card. Does focusing on one dimension lead to more considered scores?</p>
+
+  <main id="main">
+    <section class="panel" aria-labelledby="title">
+      <div class="panel-head">
+        <h1 id="title">Weaver Wheel</h1>
+        <span class="legend" id="legend"><span class="sw" aria-hidden="true"></span>Your view</span>
+      </div>
+
+      <div id="notice" class="notice" hidden>
+        <p id="noticeText"></p>
+        <div class="row2">
+          <button type="button" id="resume" class="btn primary">Resume</button>
+          <button type="button" id="discard" class="btn">Discard</button>
+        </div>
+      </div>
+
+      <div id="loading" class="loading" hidden>
+        <svg viewBox="-165 -152 330 290" class="skel" aria-hidden="true"><polygon points="0,-100 95.1,-30.9 58.8,80.9 -58.8,80.9 -95.1,-30.9"/><polygon points="0,-50 47.6,-15.5 29.4,40.5 -29.4,40.5 -47.6,-15.5"/></svg>
+        <p>Loading Weaver Wheel…</p>
+      </div>
+
+      <div id="loadErr" class="loaderr" hidden>
+        <p><span class="bang" aria-hidden="true">!</span> Couldn't load the Weaver Wheel.</p>
+        <button type="button" id="retryLoad" class="btn">Retry</button>
+      </div>
+
+      <div id="ready" hidden>
+        <div id="radarWrap" class="radar-wrap"></div>
+        <p id="values" class="values"></p>
+        <p id="caption" class="caption"></p>
+        <p id="prov" class="prov">Set by you (teacher). Teacher observation, not a diagnosis.</p>
+        <p id="empty" class="empty">No scores yet. These are your observations, not a diagnosis.</p>
+        <p id="updated" class="updated"></p>
+        <div id="viewActions"><button type="button" id="primary" class="btn primary block"></button></div>
+        <div id="editor"></div>
+      </div>
+    </section>
+    <p class="foot">Prototype: saved on this device only.</p>
+  </main>
+</div>
+
+<div id="bar" class="bar" hidden>
+  <p id="barErr" class="bar-err" aria-live="assertive"></p>
+  <div class="bar-row">
+    <span id="chip" class="chip"><span class="dot" aria-hidden="true"></span>Unsaved changes</span>
+    <button type="button" id="cancel" class="btn">Cancel</button>
+    <button type="button" id="save" class="btn primary">Save</button>
+  </div>
+</div>
+
+<div id="status" class="sr" aria-live="polite"></div>
+
+<div id="backdrop" class="backdrop" hidden></div>
+<div id="sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-head">
+    <h2 id="sheetTitle">Proto controls</h2>
+    <button type="button" id="sheetClose" class="btn">Close</button>
+  </div>
+  <p class="muted small">Only affects v3 on this device.</p>
+  <label class="tgl"><input type="checkbox" id="cSlow"> <span>Slow load <small>(1.5 s on every load)</small></span></label>
+  <label class="tgl"><input type="checkbox" id="cFail"> <span>Fail load <small>(ignores saved data)</small></span></label>
+  <label class="tgl"><input type="checkbox" id="cFailSave"> <span>Fail next save <small>(once, then turns off)</small></span></label>
+  <fieldset class="ls" id="lsField">
+    <legend>Last saved</legend>
+    <label class="tgl"><input type="radio" name="ls" value="just now"> <span>just now</span></label>
+    <label class="tgl"><input type="radio" name="ls" value="2 days ago"> <span>2 days ago</span></label>
+    <label class="tgl"><input type="radio" name="ls" value="3 weeks ago"> <span>3 weeks ago</span></label>
+    <p class="muted small" id="lsNote"></p>
+  </fieldset>
+  <div class="sheet-actions">
+    <button type="button" id="cBad" class="btn">Bad stored value</button>
+    <button type="button" id="cEmpty" class="btn">Start empty</button>
+    <button type="button" id="cReset" class="btn">Reset demo</button>
+  </div>
+  <p class="muted small">Start empty clears saved + draft, keeps toggles. Reset demo also resets toggles. Neither touches other variations.</p>
+</div>
+
+<script>
+(function () {
+'use strict';
+var V = 'v3';
+var DIMS = ['Emotional Reg', 'Focus', 'Engagement', 'Task Completion', 'Social'];
+var SHORT = { 'Emotional Reg': 'Emo Reg', 'Task Completion': 'Task Comp' };
+var ANCH = ['', 'Rarely', 'Sometimes', 'About half the time', 'Usually', 'Almost always'];
+var HINTS = {
+  'Emotional Reg': 'Recovers after a mistake or frustration',
+  'Focus': 'Stays on a task with normal room noise',
+  'Engagement': 'Joins in when something new starts',
+  'Task Completion': 'Finishes work once it gets hard',
+  'Social': 'Works well with a partner'
+};
+var K_SAVED = 'wvr235:' + V + ':student:tobin';
+var K_DRAFT = K_SAVED + ':draft';
+var K_CTRL = 'wvr235:' + V + ':controls';
+var NS = 'http://www.w3.org/2000/svg';
+var LS_OFFSETS = { 'just now': 0, '2 days ago': 2 * 864e5, '3 weeks ago': 21 * 864e5 };
+var VAL_MSG = 'Set at least one dimension before saving.';
+var FAIL_MSG = 'Not saved. Check your connection and try again.';
+var IMPL = {}; // filled by the variant chunk
+
+function $(id) { return document.getElementById(id); }
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function slug(d) { return d.toLowerCase().replace(/[^a-z]+/g, '-'); }
+function emptyScores() { var o = {}; DIMS.forEach(function (d) { o[d] = null; }); return o; }
+function copy(s) { var o = {}; DIMS.forEach(function (d) { o[d] = s[d]; }); return o; }
+function same(a, b) { return DIMS.every(function (d) { return a[d] === b[d]; }); }
+function allNull(s) { return DIMS.every(function (d) { return s[d] === null; }); }
+function countSet(s) { return DIMS.filter(function (d) { return s[d] !== null; }).length; }
+function valText(v) { return v === null ? 'Not set' : v + ' · ' + ANCH[v]; }
+function ariaVal(v) { return v === null ? 'Not set' : v + ', ' + ANCH[v]; }
+function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { window.localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+function lsDel(k) { try { window.localStorage.removeItem(k); } catch (e) { } }
+
+function loadControls() {
+  var d = { slow: false, failLoad: false, failNextSave: false, lastSaved: 'just now' };
+  try {
+    var c = JSON.parse(lsGet(K_CTRL) || 'null');
+    if (c && typeof c === 'object') Object.keys(d).forEach(function (k) { if (typeof c[k] === typeof d[k]) d[k] = c[k]; });
+  } catch (e) { }
+  if (!(d.lastSaved in LS_OFFSETS)) d.lastSaved = 'just now';
+  return d;
+}
+function saveControls() { lsSet(K_CTRL, JSON.stringify(C)); }
+
+// Fail-closed parse: every score must be null or a whole number 1-5, all 5 keys present, nothing extra.
+function parseRecord(raw, needTime) {
+  var r = JSON.parse(raw);
+  if (!r || typeof r !== 'object' || !r.scores || typeof r.scores !== 'object' || Array.isArray(r.scores)) throw new Error('shape');
+  Object.keys(r.scores).forEach(function (k) { if (DIMS.indexOf(k) < 0) throw new Error('key'); });
+  var out = {};
+  DIMS.forEach(function (d) {
+    if (!(d in r.scores)) throw new Error('missing');
+    var v = r.scores[d];
+    if (!(v === null || (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 5))) throw new Error('value');
+    out[d] = v;
+  });
+  var t = typeof r.updatedAt === 'string' && !isNaN(Date.parse(r.updatedAt)) ? r.updatedAt : null;
+  if (needTime && !t) throw new Error('time');
+  return { scores: out, updatedAt: t, updatedBy: 'teacher', draftAt: typeof r.draftAt === 'string' && !isNaN(Date.parse(r.draftAt)) ? r.draftAt : null };
+}
+
+function rel(iso) {
+  var s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  function p(n, u) { return n + ' ' + u + (n === 1 ? '' : 's') + ' ago'; }
+  if (s < 60) return 'just now';
+  if (s < 3600) return p(Math.floor(s / 60), 'minute');
+  if (s < 86400) return p(Math.floor(s / 3600), 'hour');
+  if (s < 7 * 86400) return p(Math.floor(s / 86400), 'day');
+  return p(Math.floor(s / (7 * 86400)), 'week');
+}
+
+var C = loadControls();
+var S = {
+  load: 'loading', saved: null, draftRec: null, mode: 'view', draft: emptyScores(),
+  saving: false, saveErr: false, valErr: false, flash: '', sheet: false, wiz: 0
+};
+
+function savedScores() { return S.saved ? S.saved.scores : emptyScores(); }
+function shown() { return S.mode === 'edit' ? S.draft : savedScores(); }
+function dirty() { return S.mode === 'edit' && !same(S.draft, savedScores()); }
+function announce(t) { var el = $('status'); el.textContent = ''; setTimeout(function () { el.textContent = t; }, 30); }
+
+/* ---------- Radar (static DOM, attributes updated on draw) ---------- */
+var R = 100;
+var RADAR = {}; // element refs
+var cur = [0, 0, 0, 0, 0], animFrom = null, animTo = null, animT0 = 0, raf = 0;
+var reduceMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+
+function ang(i) { return (-90 + 72 * i) * Math.PI / 180; }
+function pt(i, r) { return [Math.cos(ang(i)) * r, Math.sin(ang(i)) * r]; }
+function el(tag, attrs, parent) {
+  var e = document.createElementNS(NS, tag);
+  for (var k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function pts(rs) { return rs.map(function (r, i) { var p = pt(i, r); return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '); }
+
+function buildRadar() {
+  var svg = el('svg', { viewBox: '-165 -152 330 290', 'class': 'radar', role: 'img', id: 'radar' });
+  var gGrid = el('g', {}, svg);
+  [20, 40, 60, 80, 100].forEach(function (r) { el('polygon', { 'class': 'grid', points: pts([r, r, r, r, r]) }, gGrid); });
+  RADAR.axes = DIMS.map(function (d, i) { var p = pt(i, R); return el('line', { 'class': 'axis', x1: 0, y1: 0, x2: p[0].toFixed(1), y2: p[1].toFixed(1) }, svg); });
+  RADAR.savedP = el('polygon', { 'class': 'savedp', points: pts(cur) }, svg);
+  RADAR.draftP = el('polygon', { 'class': 'draftp', points: pts(cur) }, svg);
+  RADAR.rings = DIMS.map(function (d, i) { var p = pt(i, R); return el('circle', { 'class': 'ring', cx: p[0].toFixed(1), cy: p[1].toFixed(1), r: 6 }, svg); });
+  RADAR.vtx = DIMS.map(function () { return el('circle', { 'class': 'vtx', r: 4 }, svg); });
+  var lr = 118;
+  RADAR.labels = DIMS.map(function (d, i) {
+    var p = pt(i, lr), anchor = 'middle', x = p[0], y = p[1];
+    if (i === 0) y -= 16;
+    if (i === 1) { anchor = 'start'; x += 2; }
+    if (i === 4) { anchor = 'end'; x -= 2; }
+    if (i === 2 || i === 3) y += 10;
+    var t = el('text', { 'class': 'lbl', x: x.toFixed(1), y: y.toFixed(1), 'text-anchor': anchor }, svg);
+    var a = el('tspan', { x: x.toFixed(1) }, t); a.textContent = SHORT[d] || d;
+    var b = el('tspan', { x: x.toFixed(1), dy: 14, 'class': 'ns' }, t); b.textContent = '';
+    return { t: t, ns: b, x: x, y: y, anchor: anchor };
+  });
+  RADAR.svg = svg;
+  if (IMPL.decorateRadar) IMPL.decorateRadar(svg);
+  $('radarWrap').appendChild(svg);
+}
+
+function targetRadii() { var s = shown(); return DIMS.map(function (d) { return s[d] === null ? 0 : s[d] * 20; }); }
+
+function animateRadar() {
+  var to = targetRadii();
+  if (reduceMQ.matches) { cancelAnimationFrame(raf); cur = to; drawRadar(); return; }
+  animFrom = cur.slice(); animTo = to; animT0 = performance.now();
+  cancelAnimationFrame(raf);
+  step(animT0 + 16); // move on the same frame as the input
+  function loop(now) { if (step(now)) raf = requestAnimationFrame(loop); }
+  raf = requestAnimationFrame(loop);
+}
+function step(now) {
+  var t = Math.min(1, Math.max(0, (now - animT0) / 150));
+  var e = 1 - Math.pow(1 - t, 3);
+  cur = animFrom.map(function (f, i) { return f + (animTo[i] - f) * e; });
+  drawRadar();
+  return t < 1;
+}
+
+function drawRadar() {
+  if (!RADAR.svg) return;
+  var s = shown(), ss = savedScores();
+  var hasSaved = !!S.saved;
+  var context = S.mode === 'edit' || hasSaved; // empty view: plain grid only
+  var curIdx = IMPL.currentAxis ? IMPL.currentAxis() : -1;
+  DIMS.forEach(function (d, i) {
+    var unset = s[d] === null;
+    RADAR.axes[i].setAttribute('class', 'axis' + (context && unset ? ' unset' : '') + (i === curIdx ? ' cur' : ''));
+    RADAR.rings[i].style.display = context && unset ? '' : 'none';
+    RADAR.labels[i].ns.textContent = context && unset ? 'Not set' : '';
+    RADAR.labels[i].t.setAttribute('class', 'lbl' + (i === curIdx ? ' cur' : ''));
+    var p = pt(i, cur[i]);
+    RADAR.vtx[i].setAttribute('cx', p[0].toFixed(1)); RADAR.vtx[i].setAttribute('cy', p[1].toFixed(1));
+    RADAR.vtx[i].style.display = context && !unset ? '' : 'none';
+  });
+  var savedR = DIMS.map(function (d) { return ss[d] === null ? 0 : ss[d] * 20; });
+  if (S.mode === 'edit') {
+    RADAR.savedP.setAttribute('class', 'savedp faint');
+    RADAR.savedP.setAttribute('points', pts(savedR));
+    RADAR.savedP.style.display = hasSaved && !allNull(ss) ? '' : 'none';
+    RADAR.draftP.setAttribute('points', pts(cur));
+    RADAR.draftP.style.display = allNull(s) && cur.every(function (r) { return r < 0.5; }) ? 'none' : '';
+  } else {
+    RADAR.savedP.setAttribute('class', 'savedp');
+    RADAR.savedP.setAttribute('points', pts(cur));
+    RADAR.savedP.style.display = hasSaved && !(allNull(ss) && cur.every(function (r) { return r < 0.5; })) ? '' : 'none';
+    RADAR.draftP.style.display = 'none';
+  }
+  RADAR.svg.setAttribute('aria-label', 'Weaver Wheel radar, your view. ' + valuesLine(s));
+  if (IMPL.onDraw) IMPL.onDraw();
+}
+
+function valuesLine(s) { return DIMS.map(function (d) { return d + ' ' + (s[d] === null ? 'Not set' : s[d]); }).join(' · '); }
+function captionText(s) {
+  var n = countSet(s); if (!n) return '';
+  var low = null;
+  DIMS.forEach(function (d) { if (s[d] !== null && (low === null || s[d] < s[low])) low = d; }); // first tied wins (proposed, OQ-8)
+  return 'Lowest right now: ' + low + '.' + (n < 5 ? ' (' + n + ' of 5 set)' : '');
+}
+
+/* ---------- Render ---------- */
+function show(id, on) { $(id).hidden = !on; }
+function render() {
+  var ready = S.load === 'ready';
+  show('loading', S.load === 'loading');
+  show('loadErr', S.load === 'error');
+  show('ready', ready);
+  var s = shown();
+  var editing = S.mode === 'edit';
+  $('title').textContent = editing && dirty() ? 'Weaver Wheel · editing' : 'Weaver Wheel';
+  show('notice', ready && !editing && !!S.draftRec);
+  if (S.draftRec) $('noticeText').textContent = 'You have unsaved changes from ' + rel(S.draftRec.draftAt || S.draftRec.updatedAt || new Date().toISOString()) + '.';
+  var emptyView = ready && !editing && !S.saved;
+  show('values', ready && !emptyView);
+  $('values').textContent = valuesLine(s);
+  var cap = captionText(s);
+  show('caption', ready && !!cap);
+  $('caption').textContent = cap;
+  show('prov', ready && !emptyView);
+  show('empty', emptyView);
+  show('updated', ready && !editing && !!S.saved);
+  if (S.saved) $('updated').innerHTML = (S.flash ? '<span class="ok">' + esc(S.flash) + '</span> · ' : '') + 'Updated ' + esc(rel(S.saved.updatedAt)) + ' by you';
+  show('viewActions', ready && !editing);
+  $('primary').textContent = S.saved ? 'Edit' : 'Set Weaver Wheel';
+  // editor
+  var ed = $('editor');
+  var fid = document.activeElement && ed.contains(document.activeElement) ? document.activeElement.getAttribute('data-fid') : null;
+  if (ready && editing) { IMPL.renderEditor(ed); } else { ed.innerHTML = ''; }
+  if (fid) { var f = ed.querySelector('[data-fid="' + fid + '"]'); if (f) f.focus(); }
+  // bar
+  show('bar', ready && editing);
+  $('chip').className = 'chip' + (dirty() ? ' on' : '');
+  var save = $('save');
+  save.textContent = S.saving ? 'Saving…' : (S.saveErr ? 'Retry' : 'Save');
+  var canSave = !S.saving && (dirty() || allNull(S.draft));
+  save.disabled = !canSave;
+  $('cancel').disabled = S.saving;
+  var err = S.valErr ? '<span class="bang" aria-hidden="true">!</span> ' + VAL_MSG : (S.saveErr ? '<span class="bang" aria-hidden="true">!</span> ' + FAIL_MSG : '');
+  if ($('barErr').innerHTML !== err) $('barErr').innerHTML = err;
+  document.body.style.paddingBottom = editing && ready ? 'calc(' + ($('bar').offsetHeight + 16) + 'px + env(safe-area-inset-bottom))' : '';
+  // sheet
+  $('cSlow').checked = C.slow; $('cFail').checked = C.failLoad; $('cFailSave').checked = C.failNextSave;
+  var lsOk = S.load === 'ready' && !!S.saved;
+  $('lsField').disabled = !lsOk;
+  $('lsNote').textContent = lsOk ? '' : 'Disabled: nothing saved yet.';
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="ls"]'), function (r) { r.checked = r.value === C.lastSaved; });
+  drawRadar();
+}
+
+/* ---------- Load ---------- */
+var loadTimer = 0;
+function load() {
+  clearTimeout(loadTimer);
+  S.load = 'loading'; S.mode = 'view'; S.saved = null; S.draftRec = null; S.flash = '';
+  cur = [0, 0, 0, 0, 0];
+  render(); announce('Loading');
+  loadTimer = setTimeout(function () {
+    if (C.failLoad) { // does not read the saved or draft keys at all
+      S.load = 'error'; render(); announce("Couldn't load the Weaver Wheel."); return;
+    }
+    try {
+      var raw = lsGet(K_SAVED);
+      S.saved = raw === null ? null : parseRecord(raw, true);
+      var draw = lsGet(K_DRAFT);
+      S.draftRec = draw === null ? null : parseRecord(draw, false);
+    } catch (e) {
+      S.saved = null; S.draftRec = null; S.load = 'error'; render(); announce("Couldn't load the Weaver Wheel."); return;
+    }
+    if (S.draftRec && same(S.draftRec.scores, savedScores())) { lsDel(K_DRAFT); S.draftRec = null; }
+    S.load = 'ready';
+    cur = targetRadii();
+    render(); announce('');
+  }, C.slow ? 1500 : 150);
+}
+
+/* ---------- Edit / save ---------- */
+function enterEdit(fromDraft) {
+  if (S.load !== 'ready') return;
+  S.mode = 'edit'; S.valErr = false; S.saveErr = false; S.flash = ''; S.wiz = 0;
+  S.draft = copy(fromDraft && S.draftRec ? S.draftRec.scores : savedScores());
+  if (fromDraft) S.draftRec = null;
+  render(); animateRadar();
+  if (IMPL.onEnterEdit) IMPL.onEnterEdit(); else focusFirst(true);
+}
+function focusFirst(keepScroll) { var f = $('editor').querySelector('[data-first]'); if (f) f.focus({ preventScroll: !!keepScroll }); }
+function persistDraft() {
+  if (dirty()) lsSet(K_DRAFT, JSON.stringify({ scores: S.draft, updatedAt: S.saved ? S.saved.updatedAt : null, updatedBy: 'teacher', draftAt: new Date().toISOString() }));
+  else lsDel(K_DRAFT);
+}
+function setScore(d, v) {
+  if (S.mode !== 'edit' || S.saving) return;
+  if (v !== null) v = Math.max(1, Math.min(5, Math.round(v)));
+  if (S.draft[d] === v) return;
+  S.draft[d] = v; S.valErr = false; S.saveErr = false; S.draftRec = null;
+  animateRadar(); // same frame as the input
+  persistDraft(); render();
+}
+function confirmDiscard() { return !dirty() || window.confirm('Discard unsaved changes?'); }
+function cancelEdit() {
+  if (S.mode !== 'edit' || S.saving) return;
+  if (!confirmDiscard()) return;
+  if (dirty()) lsDel(K_DRAFT);
+  S.mode = 'view'; S.valErr = false; S.saveErr = false;
+  render(); animateRadar();
+  $('primary').focus();
+}
+function save() {
+  if (S.saving || S.mode !== 'edit') return;
+  if (allNull(S.draft)) {
+    S.valErr = true; render();
+    if (IMPL.onValidationFail) IMPL.onValidationFail(); else focusFirst();
+    return;
+  }
+  if (!dirty()) return;
+  S.saving = true; S.saveErr = false; S.valErr = false; render();
+  setTimeout(function () {
+    S.saving = false;
+    var ok = !C.failNextSave;
+    if (C.failNextSave) { C.failNextSave = false; saveControls(); }
+    var rec = { scores: copy(S.draft), updatedAt: new Date().toISOString(), updatedBy: 'teacher' };
+    if (ok) ok = lsSet(K_SAVED, JSON.stringify(rec)); // raw 1-5 or null only; x20 happens at draw time
+    if (!ok) { S.saveErr = true; persistDraft(); render(); announce('Not saved'); return; }
+    lsDel(K_DRAFT);
+    S.saved = rec; S.draftRec = null; C.lastSaved = 'just now'; saveControls();
+    S.mode = 'view'; S.flash = 'Saved';
+    render(); animateRadar(); announce('Saved');
+    $('primary').focus();
+  }, 400);
+}
+
+/* ---------- Controls sheet ---------- */
+var lastFocus = null;
+function openSheet() {
+  lastFocus = document.activeElement; S.sheet = true;
+  $('sheet').hidden = false; $('backdrop').hidden = false; $('pill').setAttribute('aria-expanded', 'true');
+  render(); $('sheetClose').focus();
+}
+function closeSheet() {
+  S.sheet = false; $('sheet').hidden = true; $('backdrop').hidden = true; $('pill').setAttribute('aria-expanded', 'false');
+  (lastFocus && document.contains(lastFocus) ? lastFocus : $('pill')).focus();
+}
+function clearAndReload(alsoControls) {
+  if (S.mode === 'edit' && !confirmDiscard()) return;
+  lsDel(K_SAVED); lsDel(K_DRAFT);
+  if (alsoControls) lsDel(K_CTRL);
+  window.location.reload();
+}
+
+/* ---------- Shared segment (radiogroup) helper for v1 and v3 ---------- */
+function segmentsHTML(d, idx, first) {
+  var v = S.draft[d], focusV = v === null ? 1 : v;
+  var h = '<div class="segs" role="radiogroup" aria-labelledby="dn-' + slug(d) + ' hint-' + slug(d) + '"' + (v === null ? ' aria-describedby="ns-' + slug(d) + '"' : '') + '>';
+  for (var n = 1; n <= 5; n++) {
+    h += '<button type="button" class="seg" role="radio" data-dim="' + idx + '" data-v="' + n + '" data-fid="seg-' + idx + '-' + n + '" aria-checked="' + (v === n) + '" aria-label="' + n + ', ' + ANCH[n] + '" tabindex="' + (n === focusV ? 0 : -1) + '"' + (first && n === focusV ? ' data-first' : '') + '>' + n + '</button>';
+  }
+  h += '</div><span class="sr" id="ns-' + slug(d) + '">Not set</span>';
+  h += '<div class="ends" aria-hidden="true"><span>1 Rarely</span><span>5 Almost always</span></div>';
+  return h;
+}
+function rowHead(d, idx) {
+  var v = S.draft[d];
+  return '<div class="l1"><span class="dn" id="dn-' + slug(d) + '">' + esc(d) + '</span><span class="rv"><b>' + esc(valText(v)) + '</b>' +
+    (v !== null ? '<button type="button" class="clear" data-clear="' + idx + '" data-fid="clear-' + idx + '" aria-label="Clear ' + esc(d) + '">Clear</button>' : '') +
+    '</span></div><p class="hint" id="hint-' + slug(d) + '">' + esc(HINTS[d]) + '</p>';
+}
+function wireSegments(root) {
+  root.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-v]');
+    if (b) { setScore(DIMS[+b.getAttribute('data-dim')], +b.getAttribute('data-v')); return; }
+    var c = e.target.closest('[data-clear]');
+    if (c) {
+      var i = +c.getAttribute('data-clear');
+      setScore(DIMS[i], null);
+      var g = root.querySelector('[data-fid="seg-' + i + '-1"]') || root.querySelector('[data-fid="dec-' + i + '"]');
+      if (g) g.focus();
+    }
+  });
+  root.addEventListener('keydown', function (e) {
+    var b = e.target.closest('[data-v]'); if (!b) return;
+    var i = +b.getAttribute('data-dim'), d = DIMS[i], v = S.draft[d], nv = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') nv = v === null ? 1 : Math.min(5, v + 1);
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') nv = v === null ? 1 : Math.max(1, v - 1);
+    else if (e.key === 'Home') nv = 1;
+    else if (e.key === 'End') nv = 5;
+    else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setScore(d, +b.getAttribute('data-v')); return; }
+    else return;
+    e.preventDefault(); setScore(d, nv);
+    var f = root.querySelector('[data-fid="seg-' + i + '-' + nv + '"]'); if (f) f.focus();
+  });
+}
+
+/* ---------- Wiring ---------- */
+function wire() {
+  $('primary').addEventListener('click', function () { enterEdit(false); });
+  $('resume').addEventListener('click', function () { enterEdit(true); });
+  $('discard').addEventListener('click', function () { lsDel(K_DRAFT); S.draftRec = null; render(); $('primary').focus(); });
+  $('retryLoad').addEventListener('click', load);
+  $('cancel').addEventListener('click', cancelEdit);
+  $('save').addEventListener('click', save);
+  $('banner').addEventListener('click', function () {
+    var b = $('banner'), open = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', String(open));
+    b.querySelector('.banner-tog').textContent = open ? 'Hide' : 'Show';
+  });
+  $('backLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    if (S.mode === 'edit') {
+      if (!confirmDiscard()) return;
+      if (dirty()) lsDel(K_DRAFT);
+      S.mode = 'view'; S.valErr = false; S.saveErr = false; render(); animateRadar();
+    }
+    announce('Room view is not part of this prototype.');
+  });
+  $('pill').addEventListener('click', openSheet);
+  $('sheetClose').addEventListener('click', closeSheet);
+  $('backdrop').addEventListener('click', closeSheet);
+  $('cSlow').addEventListener('change', function (e) { C.slow = e.target.checked; saveControls(); });
+  $('cFail').addEventListener('change', function (e) { C.failLoad = e.target.checked; saveControls(); });
+  $('cFailSave').addEventListener('change', function (e) { C.failNextSave = e.target.checked; saveControls(); });
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="ls"]'), function (r) {
+    r.addEventListener('change', function () {
+      if (!S.saved || S.load !== 'ready') return;
+      C.lastSaved = r.value; saveControls();
+      S.saved.updatedAt = new Date(Date.now() - LS_OFFSETS[r.value]).toISOString();
+      lsSet(K_SAVED, JSON.stringify({ scores: S.saved.scores, updatedAt: S.saved.updatedAt, updatedBy: 'teacher' }));
+      S.flash = ''; render();
+    });
+  });
+  $('cBad').addEventListener('click', function () {
+    if (S.mode === 'edit' && !confirmDiscard()) return;
+    lsSet(K_SAVED, '{"scores":{"Focus":7}}'); lsDel(K_DRAFT); window.location.reload();
+  });
+  $('cEmpty').addEventListener('click', function () { clearAndReload(false); });
+  $('cReset').addEventListener('click', function () { clearAndReload(true); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if (S.sheet) { e.preventDefault(); closeSheet(); return; }
+      if (S.mode === 'edit') { e.preventDefault(); cancelEdit(); }
+      return;
+    }
+    if (e.key === 'Tab' && S.sheet) { // keep focus inside the sheet
+      var f = Array.prototype.filter.call($('sheet').querySelectorAll('button,input'), function (x) { return !x.disabled && x.offsetParent !== null; });
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    }
+  });
+  window.addEventListener('beforeunload', function (e) { if (dirty()) { e.preventDefault(); e.returnValue = ''; } }); // desktop extra only
+  window.addEventListener('resize', function () { if (S.mode === 'edit') render(); });
+}
+function init() { buildRadar(); wire(); if (IMPL.wire) IMPL.wire(); load(); }
+var LBL_HITS = [];
+IMPL.currentAxis = function () { return S.mode === 'edit' && S.wiz < 5 ? S.wiz : -1; };
+IMPL.renderEditor = function (ed) {
+  var h;
+  if (S.wiz < 5) {
+    var i = S.wiz, d = DIMS[i], v = S.draft[d];
+    var dots = DIMS.map(function (x, j) { return '<span class="dot3' + (j === i ? ' on' : '') + '"></span>'; }).join('');
+    var fwd = i === 4 ? 'Review' : (v === null ? 'Skip' : 'Next');
+    h = '<div class="card3"><p class="prog">' + (i + 1) + ' of 5 <span class="dots3" aria-hidden="true">' + dots + '</span></p>' +
+      rowHead(d, i) + segmentsHTML(d, i, true) +
+      '<div class="nav3"><button type="button" class="btn" data-nav="back" data-fid="back"' + (i === 0 ? ' disabled' : '') + '>Back</button>' +
+      '<button type="button" class="btn primary" data-nav="fwd" data-fid="fwd">' + fwd + '</button></div></div>';
+  } else {
+    h = '<div class="card3"><p class="prog">Review</p><ul class="rev">' + DIMS.map(function (d, j) {
+      return '<li><button type="button" class="btn revrow" data-jump="' + j + '" data-fid="jump-' + j + '"' + (j === 0 ? ' data-first' : '') + '><span>' + esc(d) + '</span><b>' + esc(valText(S.draft[d])) + '</b></button></li>';
+    }).join('') + '</ul><div class="nav3"><button type="button" class="btn" data-nav="back" data-fid="back">Back</button></div></div>';
+  }
+  ed.innerHTML = h;
+};
+function goCard(n, keepScroll) {
+  S.wiz = n; render(); focusFirst(keepScroll);
+}
+IMPL.onEnterEdit = function () { goCard(0, true); };
+IMPL.onValidationFail = function () { goCard(0); };
+IMPL.decorateRadar = function (svg) {
+  LBL_HITS = DIMS.map(function (d, i) {
+    var L = RADAR.labels[i];
+    var cx = L.anchor === 'start' ? L.x + 26 : (L.anchor === 'end' ? L.x - 26 : L.x);
+    var rx = Math.max(-165, Math.min(165 - 68, cx - 34));
+    var r = el('rect', { 'class': 'lblhit', x: rx.toFixed(1), y: (L.y - 24).toFixed(1), width: 68, height: 52, rx: 8, role: 'button', tabindex: '-1', 'aria-label': 'Go to ' + d + ' card' }, svg);
+    function go() { if (S.mode === 'edit' && !S.saving) goCard(i); }
+    r.addEventListener('click', go);
+    r.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    return r;
+  });
+};
+IMPL.onDraw = function () {
+  var editing = S.mode === 'edit';
+  LBL_HITS.forEach(function (r) { r.style.display = editing ? '' : 'none'; r.setAttribute('tabindex', editing ? '0' : '-1'); });
+};
+IMPL.wire = function () {
+  var ed = $('editor');
+  wireSegments(ed);
+  ed.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-nav]');
+    if (b) { goCard(b.getAttribute('data-nav') === 'back' ? Math.max(0, S.wiz - 1) : Math.min(5, S.wiz + 1)); return; }
+    var j = e.target.closest('[data-jump]');
+    if (j) goCard(+j.getAttribute('data-jump'));
+  });
+};
+init();
+
+})();
+</script>
+</body>
+</html>
