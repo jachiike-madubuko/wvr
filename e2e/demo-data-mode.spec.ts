@@ -16,7 +16,7 @@ test("toggles sales_walkthrough <-> interactive_onboarding, slices subjects, res
   page,
   request,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const pageErrors: string[] = [];
   page.on("pageerror", (err) => pageErrors.push(err.message));
 
@@ -29,6 +29,21 @@ test("toggles sales_walkthrough <-> interactive_onboarding, slices subjects, res
     await expect(page.getByTestId("demo-settings-btn")).toContainText("Demo: Sales");
     await expect(page.locator("[data-student-id]")).toHaveCount(8);
     await expect(page.locator("[data-student-id]", { hasText: "Pulsar" })).toBeVisible();
+
+    // 1b. Verify Calendar Week shows wavy bars on multiple days and no active day is 100% one band
+    await page.getByTestId("tab-calendar").click();
+    await expect(page.getByTestId("calendar-grid")).toBeVisible();
+    const activeDayCards = page.locator(
+      '[data-testid="calendar-grid"] [data-iso]:has(svg)',
+    );
+    const activeCardCount = await activeDayCards.count();
+    expect(activeCardCount).toBeGreaterThanOrEqual(2);
+    for (let i = 0; i < activeCardCount; i++) {
+      const cardText = await activeDayCards.nth(i).innerText();
+      expect(cardText).not.toContain("100% ahead");
+      expect(cardText).not.toContain("100% behind");
+    }
+    await page.getByTestId("tab-galaxy").click();
 
     // 2. Open Settings -> Demo Data drawer and switch to interactive_onboarding
     await page.getByTestId("demo-settings-btn").click();
@@ -65,7 +80,9 @@ test("toggles sales_walkthrough <-> interactive_onboarding, slices subjects, res
 
     // 4. Open Nebula's profile, click red struggle node, and approve offline plan (closed-loop resolution)
     await page.getByTestId("onboarding-step-nebula").click();
-    await expect(page.getByRole("heading", { name: "Nebula" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Nebula" })).toBeVisible({
+      timeout: 15_000,
+    });
     const nebulaStruggle = page
       .locator('[data-testid="mastery-chart"] svg [data-testid^="mastery-node-"][data-kind="struggle"]')
       .first();

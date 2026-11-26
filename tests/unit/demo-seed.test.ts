@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { describe, expect, test } from "vitest";
+import { dayPace, pacePercents } from "@/domain/pace/pace";
 import {
   assertSafeDemoEnv,
   clearDemoData,
@@ -11,6 +12,7 @@ import {
   seedDemoProfile,
   uuidv5,
 } from "@/lib/demo/seed";
+import { buildPaceSessions } from "@/lib/room/data";
 
 const MIGRATIONS_DIR = resolve(process.cwd(), "db", "migrations");
 
@@ -137,5 +139,126 @@ describe("demo seed pipeline (UUIDv5, prod guards, idempotency, safe purge)", ()
     ).rows;
     expect(analytics.length).toBeGreaterThanOrEqual(4);
     expect(analytics.every((a) => a.is_demo)).toBe(true);
+  });
+
+  test("weekday demo fixtures produce mixed pace bands across multiple days, survive profile switch, and clear cleanly", async () => {
+    const db = await createMigratedDb();
+    await seedDemoProfile(db, "sales_walkthrough");
+
+    const students = (
+      await db.query<{ id: string; first_name: string }>(
+        "select id, first_name from public.students where is_demo = true",
+      )
+    ).rows.map((s) => ({ id: s.id, firstName: s.first_name, packId: "pack_space", version: 1 }));
+
+    const blocks = (
+      await db.query<{
+        id: string;
+        start_date: string;
+        end_date: string;
+        kind: "unit" | "lesson";
+        status: string;
+        title: string;
+        subjects: string[];
+      }>(
+        `select id, to_char(start_date, 'YYYY-MM-DD') as start_date,
+                to_char(end_date, 'YYYY-MM-DD') as end_date,
+                kind, status, title, subjects
+           from public.calendar_blocks
+          where is_demo = true
+          order by start_date asc`,
+      )
+    ).rows.map((b) => ({
+      id: b.id,
+      startDate: b.start_date,
+      endDate: b.end_date,
+      kind: b.kind,
+      status: b.status,
+      title: b.title,
+      subjects: b.subjects,
+      assignment: {},
+    }));
+
+    const tokens = (
+      await db.query<{
+        calendar_block_id: string;
+        payload: { blocks?: { id: string; title: string; role?: string; durationSec?: number }[] };
+      }>("select calendar_block_id, payload from public.student_path_tokens where is_demo = true")
+    ).rows.map((t) => ({
+      calendarBlockId: t.calendar_block_id,
+      blocks: Array.isArray(t.payload?.blocks) ? t.payload.blocks : [],
+    }));
+
+    const pathSessions = (
+      await db.query<{
+        student_id: string;
+        calendar_block_id: string;
+        progress: { blockMs?: Record<string, number> };
+      }>(
+        `select s.student_id, t.calendar_block_id, s.progress
+           from public.student_path_sessions s
+           join public.student_path_tokens t on t.id = s.path_token_id
+          where s.is_demo = true`,
+      )
+    ).rows.map((ps) => ({
+      studentId: ps.student_id,
+      calendarBlockId: ps.calendar_block_id,
+      blockMs: ps.progress?.blockMs ?? {},
+    }));
+
+    const blockEvents = (
+      await db.query<{ student_id: string; block_id: string; duration_sec: number; status: string }>(
+        "select student_id, block_id, duration_sec, status from public.block_events where is_demo = true",
+      )
+    ).rows.map((e) => ({
+      studentId: e.student_id,
+      blockId: e.block_id,
+      durationSec: e.duration_sec,
+      status: e.status,
+    }));
+
+    const sessions = buildPaceSessions({ students, blocks, tokens, pathSessions, blockEvents });
+    const lessonDates = [...new Set(blocks.filter((b) => b.kind === "lesson").map((b) => b.startDate))];
+    expect(lessonDates.length).toBeGreaterThanOrEqual(5);
+
+    const mixedDays: string[] = [];
+    for (const date of lessonDates) {
+      const pace = dayPace({ date, blocks, students, sessions });
+      if (pace.empty) continue;
+      const pct = pacePercents(pace);
+      const nonZeroBands = [pct.ahead, pct.on, pct.behind].filter((v) => v > 0).length;
+      expect(nonZeroBands).toBeGreaterThanOrEqual(2);
+      mixedDays.push(date);
+    }
+    expect(mixedDays.length).toBeGreaterThanOrEqual(2);
+
+    // Profile switch preserves weekday lesson blocks
+    const countBefore = (
+      await db.query<{ n: number }>(
+        "select count(*)::int as n from public.calendar_blocks where kind = 'lesson' and is_demo = true",
+      )
+    ).rows[0]!.n;
+    await seedDemoProfile(db, "interactive_onboarding");
+    const countAfterSwitch = (
+      await db.query<{ n: number }>(
+        "select count(*)::int as n from public.calendar_blocks where kind = 'lesson' and is_demo = true",
+      )
+    ).rows[0]!.n;
+    expect(countAfterSwitch).toBe(countBefore);
+
+    // Clear removes all demo weekday lesson blocks & sessions
+    await clearDemoData(db);
+    const remainingBlocks = (
+      await db.query<{ n: number }>(
+        "select count(*)::int as n from public.calendar_blocks where is_demo = true",
+      )
+    ).rows[0]!.n;
+    const remainingSessions = (
+      await db.query<{ n: number }>(
+        "select count(*)::int as n from public.student_path_sessions where is_demo = true",
+      )
+    ).rows[0]!.n;
+    expect(remainingBlocks).toBe(0);
+    expect(remainingSessions).toBe(0);
   });
 });

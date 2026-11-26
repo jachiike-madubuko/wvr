@@ -86,6 +86,14 @@ export function assertSafeDemoEnv(
   return { directUrl, teacherId };
 }
 
+export const WEEK_LESSONS = [
+  { slug: "space-mon", dayOffset: 0, title: "Planet Halves Warmup", subjects: ["math", "ela"] },
+  { slug: "space-tue", dayOffset: 1, title: "Orbit Fractions Warmup", subjects: ["math", "science"] },
+  { slug: "space-wed", dayOffset: 2, title: "Crater Measure Lab", subjects: ["math", "ela", "science"] },
+  { slug: "space-thu", dayOffset: 3, title: "Moon Base Patterns", subjects: ["math", "social_studies"] },
+  { slug: "space-fri", dayOffset: 4, title: "Constellation Capstone", subjects: ["math", "art"] },
+] as const;
+
 export const DEMO_IDS = {
   piiScan: uuidv5("weaver:pii_scan:space-standards-v1"),
   recipe: uuidv5("weaver:recipe:space-fractions-core-v1"),
@@ -93,8 +101,22 @@ export const DEMO_IDS = {
   unitBlock: uuidv5("weaver:calendar_block:unit:space-mission"),
   lessonPrev: uuidv5("weaver:calendar_block:lesson:space-warmup"),
   lessonToday: uuidv5("weaver:calendar_block:lesson:space-happy-path"),
+  weekLessons: {
+    "space-mon": uuidv5("weaver:calendar_block:lesson:space-mon"),
+    "space-tue": uuidv5("weaver:calendar_block:lesson:space-tue"),
+    "space-wed": uuidv5("weaver:calendar_block:lesson:space-wed"),
+    "space-thu": uuidv5("weaver:calendar_block:lesson:space-thu"),
+    "space-fri": uuidv5("weaver:calendar_block:lesson:space-fri"),
+  },
   pathToken: uuidv5("weaver:path_token:demo-space-lesson"),
   pathTokenPrev: uuidv5("weaver:path_token:demo-space-warmup"),
+  weekPathTokens: {
+    "space-mon": uuidv5("weaver:path_token:demo-space-mon"),
+    "space-tue": uuidv5("weaver:path_token:demo-space-tue"),
+    "space-wed": uuidv5("weaver:path_token:demo-space-wed"),
+    "space-thu": uuidv5("weaver:path_token:demo-space-thu"),
+    "space-fri": uuidv5("weaver:path_token:demo-space-fri"),
+  },
   students: {
     nebula: uuidv5("weaver:student:nebula-stalled"),
     maya: uuidv5("weaver:student:maya-split-pace"),
@@ -106,6 +128,58 @@ export const DEMO_IDS = {
     noah: uuidv5("weaver:student:noah-steady"),
   },
 } as const;
+
+type DayBand = "ahead" | "on" | "behind";
+
+// Per-student, per-weekday (0=Mon..4=Fri) pace profile so every past school day has a realistic mix of bands.
+const DAY_PROFILE: Record<keyof typeof DEMO_IDS.students, Record<number, DayBand>> = {
+  nebula: { 0: "on", 1: "behind", 2: "behind", 3: "behind", 4: "on" },
+  maya: { 0: "behind", 1: "on", 2: "ahead", 3: "behind", 4: "behind" },
+  cosmo: { 0: "on", 1: "ahead", 2: "on", 3: "on", 4: "ahead" },
+  astra: { 0: "ahead", 1: "on", 2: "ahead", 3: "ahead", 4: "ahead" },
+  pulsar: { 0: "behind", 1: "behind", 2: "on", 3: "behind", 4: "behind" },
+  leo: { 0: "on", 1: "behind", 2: "ahead", 3: "on", 4: "on" },
+  zoe: { 0: "ahead", 1: "ahead", 2: "on", 3: "ahead", 4: "ahead" },
+  noah: { 0: "behind", 1: "on", 2: "behind", 3: "behind", 4: "on" },
+};
+
+// Pin budgets matching recommendedBlockMs(mapRoleToPinType(role)): Start=read (240s), Try/Check=questions (480s), Next=write (300s).
+function pinBudgetMs(role: string): number {
+  const lower = role.toLowerCase();
+  if (lower === "try" || lower === "check") return 480_000;
+  if (lower === "next") return 300_000;
+  return 240_000;
+}
+
+function progressForBand(
+  band: DayBand,
+  pins: Array<{ id: string; role: string }>,
+): { completedBlockIds: string[]; blockMs: Record<string, number> } {
+  if (pins.length === 0) return { completedBlockIds: [], blockMs: {} };
+  const blockMs: Record<string, number> = {};
+  if (band === "ahead") {
+    for (const pin of pins) {
+      blockMs[pin.id] = Math.round(pinBudgetMs(pin.role) * 0.4);
+    }
+    return { completedBlockIds: pins.map((p) => p.id), blockMs };
+  }
+  if (band === "on") {
+    const started = pins.slice(0, Math.max(1, pins.length - 1));
+    for (const pin of started) {
+      blockMs[pin.id] = Math.round(pinBudgetMs(pin.role) * 0.65);
+    }
+    return { completedBlockIds: started.map((p) => p.id), blockMs };
+  }
+  // behind: first pin started normally, second pin (or first if single) exceeds 2x its recommended budget
+  const first = pins[0]!;
+  const stalled = pins[1] ?? first;
+  blockMs[first.id] = Math.round(pinBudgetMs(first.role) * 0.45);
+  blockMs[stalled.id] = pinBudgetMs(stalled.role) * 2 + 60_000;
+  return {
+    completedBlockIds: stalled.id === first.id ? [] : [first.id],
+    blockMs,
+  };
+}
 
 type BlockEventSpec = {
   slug: string;
@@ -223,6 +297,7 @@ const CORE_STUDENTS: readonly StudentSpec[] = [
       { slug: "hook", blockId: "hook", subject: "hook", attempts: 1, durationSec: 95, status: "completed", errorLog: [], hoursAgo: 30 },
       { slug: "math_1", blockId: "math", subject: "math", attempts: 4, durationSec: 240, status: "struggling", errorLog: ["unequal parts"], hoursAgo: 20 },
       { slug: "ela_1", blockId: "ela", subject: "ela", attempts: 2, durationSec: 165, status: "completed", errorLog: [], hoursAgo: 16 },
+      { slug: "ss_1", blockId: "social_studies", subject: "social_studies", attempts: 2, durationSec: 150, status: "completed", errorLog: [], hoursAgo: 10 },
       { slug: "sci_1", blockId: "science", subject: "science", attempts: 1, durationSec: 65, status: "completed", errorLog: [], hoursAgo: 5 },
       { slug: "art_1", blockId: "art", subject: "art", attempts: 1, durationSec: 70, status: "completed", errorLog: [], hoursAgo: 2 },
     ],
@@ -261,7 +336,7 @@ const CORE_STUDENTS: readonly StudentSpec[] = [
       { slug: "hook", blockId: "hook", subject: "hook", attempts: 1, durationSec: 120, status: "completed", errorLog: [], hoursAgo: 28 },
       { slug: "math_1", blockId: "math", subject: "math", attempts: 2, durationSec: 185, status: "completed", errorLog: [], hoursAgo: 22 },
       { slug: "ela_1", blockId: "ela", subject: "ela", attempts: 2, durationSec: 195, status: "completed", errorLog: [], hoursAgo: 14 },
-      { slug: "sci_1", blockId: "science", subject: "science", attempts: 2, durationSec: 190, status: "completed", errorLog: [], hoursAgo: 6 },
+      { slug: "sci_1", blockId: "science", subject: "science", attempts: 1, durationSec: 65, status: "completed", errorLog: [], hoursAgo: 6 },
       { slug: "ss_1", blockId: "social_studies", subject: "social_studies", attempts: 2, durationSec: 180, status: "completed", errorLog: [], hoursAgo: 3 },
       { slug: "art_1", blockId: "art", subject: "art", attempts: 2, durationSec: 185, status: "completed", errorLog: [], hoursAgo: 1 },
     ],
@@ -381,7 +456,9 @@ const SALES_EXTRA_STUDENTS: readonly StudentSpec[] = [
     events: [
       { slug: "hook", blockId: "hook", subject: "hook", attempts: 1, durationSec: 100, status: "completed", errorLog: [], hoursAgo: 24 },
       { slug: "math_1", blockId: "math", subject: "math", attempts: 4, durationSec: 390, status: "struggling", errorLog: ["Simulated LLM API 500 / Timeout trigger"], hoursAgo: 3 },
+      { slug: "ela_1", blockId: "ela", subject: "ela", attempts: 3, durationSec: 230, status: "struggling", errorLog: ["Lost place mid-passage"], hoursAgo: 2 },
       { slug: "sci_1", blockId: "science", subject: "science", attempts: 2, durationSec: 165, status: "completed", errorLog: [], hoursAgo: 1 },
+      { slug: "art_1", blockId: "art", subject: "art", attempts: 1, durationSec: 60, status: "completed", errorLog: [], hoursAgo: 1 },
     ],
     wheel: [
       ["hard", "breaks"],
@@ -421,6 +498,8 @@ const SALES_EXTRA_STUDENTS: readonly StudentSpec[] = [
       { slug: "math_1", blockId: "math", subject: "math", attempts: 2, durationSec: 150, status: "completed", errorLog: [], hoursAgo: 14 },
       { slug: "ela_1", blockId: "ela", subject: "ela", attempts: 1, durationSec: 60, status: "completed", errorLog: [], hoursAgo: 6 },
       { slug: "sci_1", blockId: "science", subject: "science", attempts: 2, durationSec: 155, status: "completed", errorLog: [], hoursAgo: 2 },
+      { slug: "ss_1", blockId: "social_studies", subject: "social_studies", attempts: 2, durationSec: 145, status: "completed", errorLog: [], hoursAgo: 2 },
+      { slug: "art_1", blockId: "art", subject: "art", attempts: 1, durationSec: 55, status: "completed", errorLog: [], hoursAgo: 1 },
     ],
     wheel: [
       ["hard", "keeps"],
@@ -479,7 +558,7 @@ const SALES_EXTRA_STUDENTS: readonly StudentSpec[] = [
       { slug: "ela_1", blockId: "ela", subject: "ela", attempts: 1, durationSec: 48, status: "completed", errorLog: [], hoursAgo: 12 },
       { slug: "sci_1", blockId: "science", subject: "science", attempts: 1, durationSec: 42, status: "completed", errorLog: [], hoursAgo: 6 },
       { slug: "ss_1", blockId: "social_studies", subject: "social_studies", attempts: 1, durationSec: 46, status: "completed", errorLog: [], hoursAgo: 3 },
-      { slug: "art_1", blockId: "art", subject: "art", attempts: 1, durationSec: 44, status: "completed", errorLog: [], hoursAgo: 1 },
+      { slug: "art_1", blockId: "art", subject: "art", attempts: 2, durationSec: 145, status: "completed", errorLog: [], hoursAgo: 1 },
     ],
     wheel: [
       ["hard", "retries"],
@@ -703,6 +782,20 @@ export async function seedDemoProfile(
     [classId, teacherId, profile],
   );
 
+  const dowRes = await client.query<{ dow: number }>(
+    `SELECT (extract(isodow from current_date)::int - 1) AS dow`,
+  );
+  const todayDow = Number(dowRes.rows[0]?.dow ?? 3); // 0=Mon..4=Fri, 5=Sat, 6=Sun
+  const extraWeekLessons = WEEK_LESSONS.filter(
+    (l) => l.dayOffset !== todayDow && l.dayOffset !== todayDow - 1,
+  );
+  const keepBlockIds = [
+    DEMO_IDS.unitBlock,
+    DEMO_IDS.lessonPrev,
+    DEMO_IDS.lessonToday,
+    ...extraWeekLessons.map((l) => DEMO_IDS.weekLessons[l.slug]),
+  ];
+
   if (opts?.reset) {
     await clearDemoData(client, { teacherId, classId, logEvent: false });
   } else {
@@ -720,7 +813,7 @@ export async function seedDemoProfile(
         WHERE class_id = $1
           AND is_demo = true
           AND NOT (id = ANY($2::uuid[]))`,
-      [classId, [DEMO_IDS.unitBlock, DEMO_IDS.lessonPrev, DEMO_IDS.lessonToday]],
+      [classId, keepBlockIds],
     );
   }
 
@@ -795,11 +888,13 @@ export async function seedDemoProfile(
     ],
   );
 
-  // Evergreen calendar blocks anchored dynamically to CURRENT_DATE
+  // Evergreen calendar blocks anchored dynamically to CURRENT_DATE / current ISO week
   await client.query(
     `INSERT INTO public.calendar_blocks
        (id, class_id, teacher_id, start_date, end_date, subjects, kind, title, variation_set_id, status, is_demo)
-     VALUES ($1, $2, $3, current_date - 2, current_date + 4,
+     VALUES ($1, $2, $3,
+             least(current_date - 2, date_trunc('week', current_date)::date),
+             greatest(current_date + 4, (date_trunc('week', current_date)::date + 4)),
              array['math', 'ela', 'science', 'social_studies', 'art'],
              'unit', 'Space Mission: Fractions & Core Standards', $4, 'approved', true)
      ON CONFLICT (id) DO UPDATE
@@ -838,6 +933,45 @@ export async function seedDemoProfile(
     ],
   );
 
+  const tokenBlocks = spaceTokenPayload(profile).blocks;
+  const weekdayPins = tokenBlocks.slice(0, 3); // hook (Start), math (Try), ela (Check)
+
+  if (extraWeekLessons.length > 0) {
+    await client.query(
+      `INSERT INTO public.calendar_blocks
+         (id, class_id, teacher_id, start_date, end_date, subjects, kind, title, unit_id, variation_set_id, status, is_demo)
+       SELECT u.id, $1::uuid, $2::uuid,
+              date_trunc('week', current_date)::date + u.day_offset,
+              date_trunc('week', current_date)::date + u.day_offset,
+              u.subjects, 'lesson', u.title, $3::uuid, $4::uuid, 'approved', true
+       FROM unnest($5::uuid[], $6::int[], $7::text[], $8::jsonb[])
+         AS raw(id, day_offset, title, subjects_json)
+       CROSS JOIN LATERAL (
+         SELECT raw.id, raw.day_offset, raw.title,
+                ARRAY(SELECT jsonb_array_elements_text(raw.subjects_json)) AS subjects
+       ) AS u
+       ON CONFLICT (id) DO UPDATE
+         SET start_date = excluded.start_date,
+             end_date = excluded.end_date,
+             subjects = excluded.subjects,
+             title = excluded.title,
+             unit_id = excluded.unit_id,
+             variation_set_id = excluded.variation_set_id,
+             status = 'approved',
+             is_demo = true`,
+      [
+        classId,
+        teacherId,
+        DEMO_IDS.unitBlock,
+        DEMO_IDS.variationSetSpace,
+        extraWeekLessons.map((l) => DEMO_IDS.weekLessons[l.slug]),
+        extraWeekLessons.map((l) => l.dayOffset),
+        extraWeekLessons.map((l) => l.title),
+        extraWeekLessons.map((l) => JSON.stringify(l.subjects)),
+      ],
+    );
+  }
+
   const tokenRes = await client.query<{ id: string }>(
     `INSERT INTO public.student_path_tokens
        (id, token_hash, calendar_block_id, variation_id, payload, progress, expires_at, is_demo)
@@ -863,7 +997,7 @@ export async function seedDemoProfile(
     title: "Orbit Fractions Warmup",
     packId: "pack_space",
     packLabel: "Space",
-    blocks: spaceTokenPayload(profile).blocks.slice(0, 2),
+    blocks: weekdayPins,
   };
   const prevTokenRes = await client.query<{ id: string }>(
     `INSERT INTO public.student_path_tokens
@@ -878,6 +1012,45 @@ export async function seedDemoProfile(
     [DEMO_IDS.pathTokenPrev, prevTokenHash, DEMO_IDS.lessonPrev, JSON.stringify(prevPayload)],
   );
   const prevTokenId = prevTokenRes.rows[0]!.id;
+
+  const weekTokenIdBySlug = new Map<string, string>();
+  if (extraWeekLessons.length > 0) {
+    const weekTokensRes = await client.query<{ id: string; calendar_block_id: string }>(
+      `INSERT INTO public.student_path_tokens
+         (id, token_hash, calendar_block_id, variation_id, payload, progress, expires_at, is_demo)
+       SELECT u.id, u.token_hash, u.calendar_block_id, 'var_space', u.payload, '{}'::jsonb,
+              now() + interval '365 days', true
+       FROM unnest($1::uuid[], $2::text[], $3::uuid[], $4::jsonb[])
+         AS u(id, token_hash, calendar_block_id, payload)
+       ON CONFLICT (token_hash) DO UPDATE
+         SET calendar_block_id = excluded.calendar_block_id,
+             payload = excluded.payload,
+             expires_at = excluded.expires_at,
+             is_demo = true
+       RETURNING id, calendar_block_id`,
+      [
+        extraWeekLessons.map((l) => DEMO_IDS.weekPathTokens[l.slug]),
+        extraWeekLessons.map((l) =>
+          createHash("sha256").update(`demo-${l.slug}`).digest("hex"),
+        ),
+        extraWeekLessons.map((l) => DEMO_IDS.weekLessons[l.slug]),
+        extraWeekLessons.map((l) =>
+          JSON.stringify({
+            title: l.title,
+            packId: "pack_space",
+            packLabel: "Space",
+            blocks: weekdayPins,
+          }),
+        ),
+      ],
+    );
+    for (const l of extraWeekLessons) {
+      const row = weekTokensRes.rows.find(
+        (r) => r.calendar_block_id === DEMO_IDS.weekLessons[l.slug],
+      );
+      if (row) weekTokenIdBySlug.set(l.slug, row.id);
+    }
+  }
 
   // Batched unnest() upserts keep Neon remote latency under ~1s and avoid idle timeouts
   const rosterIds = roster.map((s) => s.id);
@@ -929,6 +1102,7 @@ export async function seedDemoProfile(
     ],
   );
 
+  const prevDow = Math.max(0, Math.min(4, todayDow - 1));
   await client.query(
     `INSERT INTO public.student_path_sessions (id, path_token_id, student_id, progress, is_demo)
      SELECT u.id, $1::uuid, u.student_id, u.progress, true
@@ -941,16 +1115,56 @@ export async function seedDemoProfile(
       roster.map((s) => uuidv5(`weaver:path_session_prev:${s.key}`)),
       roster.map((s) => s.id),
       roster.map((s) =>
-        JSON.stringify({
-          completedBlockIds: s.completedBlockIds.filter((b) => b === "hook" || b === "math"),
-          blockMs: {
-            ...(s.blockMs.hook ? { hook: s.blockMs.hook } : {}),
-            ...(s.blockMs.math ? { math: s.blockMs.math } : {}),
-          },
-        }),
+        JSON.stringify(progressForBand(DAY_PROFILE[s.key][prevDow] ?? "on", weekdayPins)),
       ),
     ],
   );
+
+  // Seed sessions for past extra weekdays this week; leave future weekdays empty
+  const pastWeekSessions = extraWeekLessons
+    .filter((l) => l.dayOffset < todayDow)
+    .flatMap((l) => {
+      const tokId = weekTokenIdBySlug.get(l.slug);
+      if (!tokId) return [];
+      return roster.map((s) => ({
+        id: uuidv5(`weaver:path_session:${l.slug}:${s.key}`),
+        tokenId: tokId,
+        studentId: s.id,
+        progress: JSON.stringify(
+          progressForBand(DAY_PROFILE[s.key][l.dayOffset] ?? "on", weekdayPins),
+        ),
+      }));
+    });
+
+  if (pastWeekSessions.length > 0) {
+    await client.query(
+      `INSERT INTO public.student_path_sessions (id, path_token_id, student_id, progress, is_demo)
+       SELECT u.id, u.token_id, u.student_id, u.progress, true
+       FROM unnest($1::uuid[], $2::uuid[], $3::uuid[], $4::jsonb[])
+         AS u(id, token_id, student_id, progress)
+       ON CONFLICT (path_token_id, student_id) DO UPDATE
+         SET progress = excluded.progress,
+             is_demo = true`,
+      [
+        pastWeekSessions.map((s) => s.id),
+        pastWeekSessions.map((s) => s.tokenId),
+        pastWeekSessions.map((s) => s.studentId),
+        pastWeekSessions.map((s) => s.progress),
+      ],
+    );
+  }
+
+  const futureTokenIds = extraWeekLessons
+    .filter((l) => l.dayOffset > todayDow)
+    .map((l) => weekTokenIdBySlug.get(l.slug))
+    .filter((id): id is string => Boolean(id));
+  if (futureTokenIds.length > 0) {
+    await client.query(
+      `DELETE FROM public.student_path_sessions
+        WHERE path_token_id = ANY($1::uuid[]) AND is_demo = true`,
+      [futureTokenIds],
+    );
+  }
 
   const flatEvents = roster.flatMap((stu) =>
     stu.events.map((ev) => ({

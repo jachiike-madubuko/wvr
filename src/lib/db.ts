@@ -1,4 +1,4 @@
-import { Pool, type PoolClient } from "pg";
+import { Client, Pool, type PoolClient } from "pg";
 
 if (typeof window !== "undefined") {
   throw new Error("src/lib/db.ts is server-only");
@@ -72,14 +72,14 @@ export async function withAnonDb<T>(
  * transactional swaps stay atomic without PgBouncer session drift.
  */
 export async function withUnpooledAdminDb<T>(
-  fn: (client: PoolClient) => Promise<T>,
+  fn: (client: Client) => Promise<T>,
   directUrl: string,
 ): Promise<T> {
   if (/-pooler\./i.test(directUrl)) {
     throw new Error("Refusing admin seed over a pooled (-pooler) Neon URL");
   }
-  const pool = new Pool({ connectionString: directUrl, max: 2, idleTimeoutMillis: 10_000 });
-  const client = await pool.connect();
+  const client = new Client({ connectionString: directUrl });
+  await client.connect();
   try {
     await client.query("BEGIN");
     const result = await fn(client);
@@ -89,7 +89,6 @@ export async function withUnpooledAdminDb<T>(
     await client.query("ROLLBACK").catch(() => {});
     throw err;
   } finally {
-    client.release();
-    await pool.end().catch(() => {});
+    await client.end().catch(() => {});
   }
 }

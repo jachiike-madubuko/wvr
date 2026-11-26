@@ -25,11 +25,11 @@ Tracked in Linear (`weaver-edu` / **WVR** / **Weavr Clean Rebuild**). One commit
 - [x] Verify, commit, push, update **WVR-237**
 
 ## Task 4: WVR-233 (fixture portion only) — Varied weekday demo fixtures & Swimlane offsets
-- [ ] Extend `src/lib/demo/seed.ts` with deterministic UUIDv5 weekday lesson blocks (`CURRENT_DATE`-anchored, past+today only), per-student per-day dwell profiles, keep-list updates, and varied Swimlane event inputs (keep Maya, keep layouts/labels)
-- [ ] Ensure `buildPaceSessions` preserves per-day session profiles without overwriting non-today days
-- [ ] Extend `tests/unit/demo-seed.test.ts` (multi-band weekdays, idempotency, profile switch keeps blocks, clear removes them)
-- [ ] Extend `e2e/demo-data-mode.spec.ts` (after Reset, Calendar Week has multiple wavy days and mixed bands)
-- [ ] Verify, commit, push, comment + tick Nov 26 ACs on **WVR-233** (do NOT change status)
+- [x] Extend `src/lib/demo/seed.ts` with deterministic UUIDv5 weekday lesson blocks (`CURRENT_DATE`-anchored, past+today only), per-student per-day dwell profiles, keep-list updates, and varied Swimlane event inputs (keep Maya, keep layouts/labels)
+- [x] Ensure `buildPaceSessions` preserves per-day session profiles without overwriting non-today days
+- [x] Extend `tests/unit/demo-seed.test.ts` (multi-band weekdays, idempotency, profile switch keeps blocks, clear removes them)
+- [x] Extend `e2e/demo-data-mode.spec.ts` (after Reset, Calendar Week has multiple wavy days and mixed bands)
+- [x] Verify, commit, push, comment + tick Nov 26 ACs on **WVR-233** (do NOT change status)
 
 ## Task 5: WVR-238 + `weaver-config` (§5a) — Track click data & attempts as struggle signal
 - [ ] Create `src/domain/config/weaver-config.ts` and switch `buildMasteryNodes` in `src/lib/students/model.ts` to `isStruggleEvent()`

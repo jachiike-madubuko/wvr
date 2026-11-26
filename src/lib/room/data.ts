@@ -99,7 +99,12 @@ export function buildPaceSessions(args: {
     status: string;
   }[];
 }): PaceSession[] {
-  const firstLesson = args.blocks.find((b) => b.kind === "lesson");
+  const lessonsWithSessions = new Set(args.pathSessions.map((ps) => ps.calendarBlockId));
+  const activeLessons = args.blocks.filter(
+    (b) => b.kind === "lesson" && lessonsWithSessions.has(b.id),
+  );
+  const targetLesson =
+    activeLessons.at(-1) ?? args.blocks.filter((b) => b.kind === "lesson").at(-1);
   const pinsByBlock = new Map<string, PacePin[]>();
   for (const token of args.tokens) {
     if (pinsByBlock.has(token.calendarBlockId)) continue;
@@ -130,11 +135,9 @@ export function buildPaceSessions(args: {
   for (const ev of args.blockEvents) {
     const stu = args.students.find((s) => s.id === ev.studentId);
     if (!stu) continue;
-    const blockId = firstLesson?.id ?? null;
+    const blockId = targetLesson?.id ?? null;
     const key = `${ev.studentId}:${blockId ?? "none"}`;
-    let session =
-      Array.from(byStudentBlock.values()).find((s) => s.studentId === ev.studentId) ??
-      byStudentBlock.get(key);
+    let session = byStudentBlock.get(key);
     if (!session) {
       session = {
         studentId: ev.studentId,
@@ -340,8 +343,10 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
     const activeLessonTitle =
       blocks.find((b) => b.kind === "lesson")?.title ?? null;
 
+    const todayIso = new Date().toISOString().slice(0, 10);
     const todayLessonId =
-      blocks.find((b) => b.kind === "lesson" && b.startDate === b.endDate && b.startDate >= new Date().toISOString().slice(0, 10))?.id ??
+      blocks.find((b) => b.kind === "lesson" && b.startDate === todayIso)?.id ??
+      blocks.filter((b) => b.kind === "lesson" && b.startDate <= todayIso).at(-1)?.id ??
       blocks.filter((b) => b.kind === "lesson").at(-1)?.id ??
       null;
 
