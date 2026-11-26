@@ -20,19 +20,28 @@ import { nodeLook } from "@/lib/avatars/look";
 import type { EquippedLoadout } from "@/lib/collectibles/catalog";
 import type { RoomPack, RoomStudent } from "@/lib/room/types";
 import { GalaxyField } from "./GalaxyField";
+import {
+  placePopover,
+  type Placement,
+  type Rect,
+} from "./galaxy-popover-position";
 
 export const OPEN_DELAY_MS = 500;
 export const CLOSE_DELAY_MS = 100;
 
 // Must match the wv-revolve duration in globals.css.
 const REVOLVE_MS = 48_000;
+const POPOVER_W = 224; // matches w-56
+const POPOVER_H_ESTIMATE = 150;
 
 type StudentWithEquipped = RoomStudent & { equipped?: EquippedLoadout };
 
 interface PopoverState {
   student: RoomStudent;
+  anchor: Rect;
   x: number;
   y: number;
+  side: Placement["side"];
 }
 
 function revolveAnimation(el: Element): Animation | undefined {
@@ -222,6 +231,7 @@ export function GalaxyHome({
   onMoveStudent: (studentId: string, toPackId: string, expectedVersion: number) => void;
 }) {
   const fieldRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -266,15 +276,41 @@ export function GalaxyHome({
   const scheduleOpen = (student: RoomStudent, target: HTMLElement) => {
     if (activeStudentId) return;
     clearTimers();
-    const rect = target.getBoundingClientRect();
     openTimerRef.current = setTimeout(() => {
-      setPopover({
-        student,
-        x: Math.max(16, Math.min(rect.left - 70, window.innerWidth - 240)),
-        y: Math.max(70, rect.top - 125),
-      });
+      const r = target.getBoundingClientRect();
+      const anchor: Rect = {
+        left: r.left,
+        top: r.top,
+        right: r.right,
+        bottom: r.bottom,
+        width: r.width,
+        height: r.height,
+      };
+      const placement = placePopover(
+        anchor,
+        { width: POPOVER_W, height: POPOVER_H_ESTIMATE },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      setPopover({ student, anchor, ...placement });
     }, OPEN_DELAY_MS);
   };
+
+  useLayoutEffect(() => {
+    if (!popover || !popoverRef.current) return;
+    const { width, height } = popoverRef.current.getBoundingClientRect();
+    const next = placePopover(
+      popover.anchor,
+      { width, height },
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+    if (
+      Math.abs(next.x - popover.x) > 0.5 ||
+      Math.abs(next.y - popover.y) > 0.5 ||
+      next.side !== popover.side
+    ) {
+      setPopover((cur) => (cur ? { ...cur, ...next } : null));
+    }
+  }, [popover]);
 
   const scheduleClose = () => {
     clearTimers();
@@ -374,7 +410,9 @@ export function GalaxyHome({
 
       {popover && (
         <div
+          ref={popoverRef}
           data-testid="student-popover"
+          data-side={popover.side}
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
           className="fixed z-50 w-56 rounded-2xl border border-[#2a344d] bg-[#111625] p-4 shadow-2xl"

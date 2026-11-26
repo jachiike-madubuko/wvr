@@ -10,11 +10,11 @@ Tracked in Linear (`weaver-edu` / **WVR** / **Weavr Clean Rebuild**). One commit
 - [x] Verify (`check:env`, `check:migrations`, `test:db`, `typecheck`, `test`, `build`, E2E), commit, push, update **WVR-240**
 
 ## Task 2: WVR-236 — Offset Galaxy node hover popover to the right of the student
-- [ ] Create pure placement helper `src/components/room/galaxy-popover-position.ts` (`placePopover`, 12 px gap, flip left, below fallback, never overlaps node)
-- [ ] Update `GalaxyHome.tsx` to measure whole node at open time, re-measure popover in `useLayoutEffect`, expose `data-side`, preserve hover timers & orbit pause
-- [ ] Add unit test `tests/unit/galaxy-popover-position.test.ts`
-- [ ] Extend `e2e/room-first.spec.ts` to assert non-overlapping right/left placement + clickable View profile at 1280px and 390px
-- [ ] Verify, commit, push, update **WVR-236**
+- [x] Create pure placement helper `src/components/room/galaxy-popover-position.ts` (`placePopover`, 12 px gap, flip left, below fallback, never overlaps node)
+- [x] Update `GalaxyHome.tsx` to measure whole node at open time, re-measure popover in `useLayoutEffect`, expose `data-side`, preserve hover timers & orbit pause
+- [x] Add unit test `tests/unit/galaxy-popover-position.test.ts`
+- [x] Extend `e2e/room-first.spec.ts` to assert non-overlapping right/left placement + clickable View profile at 1280px and 390px
+- [x] Verify, commit, push, update **WVR-236**
 
 ## Task 3: WVR-237 — Clicking a Galaxy group title opens a group-level pacing breakdown
 - [ ] Create pure aggregation helper `src/components/room/group-pacing.ts` (`groupPacing`)
