@@ -1,4 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
+import { StudentSwitchModal } from "@/components/student-path/StudentSwitchModal";
 import { isStruggleEvent, weaverConfig } from "@/domain/config/weaver-config";
 import { B, byId, FACE } from "@/lib/blocks/library";
 import { assertAllowedPayload } from "@/lib/events/allowlist";
@@ -171,4 +174,51 @@ test("resolveInitialStudent matches valid roster ID and fails closed for unknown
   expect(resolveInitialStudent(roster, undefined)).toBeNull();
   expect(resolveInitialStudent(roster, null)).toBeNull();
   expect(resolveInitialStudent(roster, "   ")).toBeNull();
+});
+
+test("StudentSwitchModal renders accessible dialog with all roster names and marks active student", () => {
+  const roster = [
+    { id: "11111111-1111-4111-8111-111111111111", firstName: "Maya" },
+    { id: "22222222-2222-4222-8222-222222222222", firstName: "Leo" },
+    { id: "33333333-3333-4333-8333-333333333333", firstName: "Cosmo" },
+  ];
+
+  const html = renderToStaticMarkup(
+    createElement(StudentSwitchModal, {
+      open: true,
+      roster,
+      currentStudentId: roster[1]!.id,
+      collectiblesByStudent: {},
+      onSelect: () => {},
+      onClose: () => {},
+    }),
+  );
+
+  expect(html).toContain('role="dialog"');
+  expect(html).toContain('aria-modal="true"');
+  expect(html).toContain('data-testid="student-switch-modal"');
+  expect(html).toContain('data-testid="student-switch-close"');
+  expect(html).toContain('data-testid="student-switch-backdrop"');
+
+  for (const item of roster) {
+    expect(html).toContain(`data-switch-student-pick="${item.firstName}"`);
+    expect(html).toContain(`<span>${item.firstName}</span>`);
+  }
+
+  expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+  expect(html).toMatch(
+    /data-switch-student-pick="Leo"[^>]*aria-current="true"/,
+  );
+
+  const closedHtml = renderToStaticMarkup(
+    createElement(StudentSwitchModal, {
+      open: false,
+      roster,
+      currentStudentId: roster[1]!.id,
+      collectiblesByStudent: {},
+      onSelect: () => {},
+      onClose: () => {},
+    }),
+  );
+  expect(closedHtml).toBe("");
 });

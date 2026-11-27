@@ -38,6 +38,7 @@ import {
 import { BreakTimer } from "./BreakTimer";
 import { CollectibleInventory } from "./CollectibleInventory";
 import { DrawPad } from "./DrawPad";
+import { StudentSwitchModal } from "./StudentSwitchModal";
 
 type FlipRect = { left: number; top: number; width: number; height: number };
 type FlipState = {
@@ -94,6 +95,7 @@ export function BlockFlip({
   const [unlockToast, setUnlockToast] = useState<CollectibleItem | null>(null);
   const [simBusy, setSimBusy] = useState(false);
   const [simToast, setSimToast] = useState<string | null>(null);
+  const [switchModalOpen, setSwitchModalOpen] = useState(false);
 
   // Flip & tile feedback state
   const [flip, setFlip] = useState<FlipState | null>(null);
@@ -158,13 +160,13 @@ export function BlockFlip({
   }, []);
 
   useEffect(() => {
-    if (!flip) return;
+    if (!flip || switchModalOpen) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeFlip();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flip, closeFlip]);
+  }, [flip, switchModalOpen, closeFlip]);
 
   const openTile = (
     block: MosaicBlock,
@@ -172,7 +174,7 @@ export function BlockFlip({
     done: boolean,
     event: MouseEvent<HTMLButtonElement>,
   ) => {
-    if (flip) return;
+    if (flip || switchModalOpen) return;
     if (!unlocked || done) {
       if (shakeTimerRef.current) window.clearTimeout(shakeTimerRef.current);
       setShakeId(block.id);
@@ -569,11 +571,13 @@ export function BlockFlip({
             )}
             <button
               type="button"
+              data-testid="switch-student-btn"
               onClick={() => {
-                setStudent(null);
+                if (flipTimerRef.current) window.clearTimeout(flipTimerRef.current);
+                if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
                 setFlip(null);
-                setUnlockToast(null);
-                setSimToast(null);
+                setBurst(false);
+                setSwitchModalOpen(true);
               }}
               className="rounded-full border border-white/15 px-3.5 py-1.5 text-xs font-semibold text-[#cbd5e1] hover:bg-white/10"
             >
@@ -1346,6 +1350,34 @@ export function BlockFlip({
             </div>
           </>
         )}
+
+        <StudentSwitchModal
+          open={switchModalOpen}
+          roster={roster}
+          currentStudentId={student.id}
+          collectiblesByStudent={collectiblesByStudent}
+          onClose={() => setSwitchModalOpen(false)}
+          onSelect={(picked) => {
+            if (flipTimerRef.current) window.clearTimeout(flipTimerRef.current);
+            if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+            setStudent(picked);
+            setActiveTab("blocks");
+            setFlip(null);
+            setBurst(false);
+            setUnlockToast(null);
+            setSimToast(null);
+            setSwitchModalOpen(false);
+            if (typeof window !== "undefined") {
+              const url = new URL(window.location.href);
+              url.searchParams.set("student", picked.id);
+              window.history.replaceState(
+                null,
+                "",
+                `${url.pathname}${url.search}${url.hash}`,
+              );
+            }
+          }}
+        />
       </main>
     </div>
   );

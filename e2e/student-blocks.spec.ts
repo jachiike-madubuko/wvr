@@ -303,3 +303,59 @@ test("counts multiple attempts on a block and flags >= highAttempts as a struggl
     });
   }
 });
+
+test("opens student-switch-modal on Switch, dismisses on Escape without teardown, and switches student with ?student= sync", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(60_000);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (err) => pageErrors.push(err.message));
+
+  const roomData = (await (await request.get("/api/room")).json()) as {
+    students: { id: string; firstName: string }[];
+  };
+  const leoId = roomData.students.find((s) => s.firstName === "Leo")!.id;
+
+  await page.goto("/s/demo-space-lesson", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("roster-picker")).toBeVisible();
+  await page.locator('[data-student-pick="Maya"]').click();
+
+  await expect(page.getByTestId("mosaic-grid")).toBeVisible();
+  await expect(page.locator("header")).toContainText("Maya");
+
+  // Click Switch -> opens modal without tearing down mosaic or showing roster-picker
+  await page.getByTestId("switch-student-btn").click();
+  const modal = page.getByTestId("student-switch-modal");
+  await expect(modal).toBeVisible();
+  await expect(modal).toHaveAttribute("role", "dialog");
+  await expect(modal).toHaveAttribute("aria-modal", "true");
+  await expect(page.getByTestId("roster-picker")).toHaveCount(0);
+  await expect(page.getByTestId("mosaic-grid")).toBeVisible();
+  await expect(modal.locator('[data-switch-student-pick="Maya"]')).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+
+  // Escape closes modal and keeps Maya active
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("student-switch-modal")).toHaveCount(0);
+  await expect(page.locator("header")).toContainText("Maya");
+  await expect(page.getByTestId("mosaic-grid")).toBeVisible();
+
+  // Re-open and switch to Leo -> updates header & ?student=<leoId>
+  await page.getByTestId("switch-student-btn").click();
+  await expect(modal).toBeVisible();
+  await modal.locator('[data-switch-student-pick="Leo"]').click();
+
+  await expect(page.getByTestId("student-switch-modal")).toHaveCount(0);
+  await expect(page.locator("header")).toContainText("Leo");
+  expect(new URL(page.url()).searchParams.get("student")).toBe(leoId);
+
+  // Reloading keeps Leo selected via ?student=<leoId>
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("roster-picker")).toHaveCount(0);
+  await expect(page.locator("header")).toContainText("Leo");
+
+  expect(pageErrors).toEqual([]);
+});
