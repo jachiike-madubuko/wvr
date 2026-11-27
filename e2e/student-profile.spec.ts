@@ -59,6 +59,9 @@ test("renders Maya profile with Bklit Weaver Wheel, Check-ins, Mastery chart, an
     expect(tickCount).toBeGreaterThanOrEqual(1);
     const boxes = [];
     for (let i = 0; i < tickCount; i++) {
+      if (chartId === "mastery-chart") {
+        await expect(tickLoc.nth(i)).toHaveText(/^\d+:\d{2}$/);
+      }
       const b = await tickLoc.nth(i).boundingBox();
       expect(b).not.toBeNull();
       expect(b!.x).toBeGreaterThanOrEqual(svgBox!.x - 2);
@@ -70,6 +73,9 @@ test("renders Maya profile with Bklit Weaver Wheel, Check-ins, Mastery chart, an
       expect(boxes[i]!.x).toBeGreaterThanOrEqual(boxes[i - 1]!.x + boxes[i - 1]!.width + 4);
     }
   }
+  await expect(
+    page.locator('[data-testid="mastery-chart"] [data-testid="attempts-threshold-line"]'),
+  ).toBeVisible();
 
   // Zoom & Filter pills work
   await page.getByTestId("zoom-week").click();

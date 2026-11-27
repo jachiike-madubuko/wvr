@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import { selectVisibleTicks } from "@/components/charts/x-axis";
 import { CheckInTrend } from "@/components/room/profile/CheckInTrend";
-import { MasteryChart } from "@/components/room/profile/MasteryChart";
+import { formatElapsed, MasteryChart } from "@/components/room/profile/MasteryChart";
 import { ProfileDrawer } from "@/components/room/profile/ProfileDrawer";
 import {
   buildCheckInSeries,
@@ -261,4 +261,55 @@ test("selectVisibleTicks prunes clustered right-edge XAxis labels, truncates lon
     480,
   );
   expect(checkins.map((t) => t.label)).toEqual(["Nov 24", "Nov 25", "Nov 26"]);
+});
+
+test("MasteryChart plots attempts per block over cumulative m:ss time with 3-try threshold", () => {
+  expect(formatElapsed(0)).toBe("0:00");
+  expect(formatElapsed(95)).toBe("1:35");
+  expect(formatElapsed(605)).toBe("10:05");
+
+  const html = renderToStaticMarkup(
+    createElement(MasteryChart, {
+      events: [
+        {
+          id: "ev-1",
+          blockId: "hook",
+          subject: "hook",
+          attempts: 1,
+          durationSec: 95,
+          status: "completed",
+          errorLog: [],
+          createdAt: "2026-11-23T15:00:00Z",
+        },
+        {
+          id: "ev-2",
+          blockId: "math",
+          subject: "math",
+          attempts: 4,
+          durationSec: 240,
+          status: "struggling",
+          errorLog: ["unequal parts"],
+          createdAt: "2026-11-23T15:10:00Z",
+        },
+      ],
+      zoom: "day",
+      filter: "both",
+      onZoom: () => {},
+      onFilter: () => {},
+      onSelectNode: () => {},
+    }),
+  );
+
+  expect(html).toContain('data-testid="attempts-threshold-line"');
+  expect(html).toContain("3 tries");
+  expect(html).toContain(">0:00</text>");
+  expect(html).toContain(">1:35</text>");
+
+  const cy1 = Number(
+    html.match(/cy="([\d.]+)"[^>]*data-testid="mastery-node-ev-1"/)?.[1] ?? NaN,
+  );
+  const cy2 = Number(
+    html.match(/cy="([\d.]+)"[^>]*data-testid="mastery-node-ev-2"/)?.[1] ?? NaN,
+  );
+  expect(cy1).toBeGreaterThan(cy2);
 });
