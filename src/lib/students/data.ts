@@ -2,7 +2,6 @@ import type { CollectibleSlot, EquippedLoadout } from "@/lib/collectibles/catalo
 import { withTeacherDb } from "@/lib/db";
 import {
   buildOfflineCoachingPlan,
-  buildWeaverWheel,
   type ActionThreadMessage,
   type ActionThreadRecord,
   type ApprovedOfflinePlan,
@@ -11,6 +10,109 @@ import {
   type StudentProfileSnapshot,
   type ThreadRequest,
 } from "./model";
+import {
+  WHEEL_COLUMNS,
+  WHEEL_DIMENSIONS,
+  parseWheelScores,
+  type WheelLoad,
+  type WheelRecord,
+  type WheelScores,
+} from "./wheel";
+
+export class WheelVersionConflict extends Error {
+  constructor() {
+    super("VERSION_CONFLICT");
+    this.name = "WheelVersionConflict";
+  }
+}
+
+const WHEEL_COLS = WHEEL_DIMENSIONS.map((d) => WHEEL_COLUMNS[d]);
+const WHEEL_RET = `${WHEEL_COLS.join(", ")}, updated_at, version`;
+
+function rowToWheelRecord(row: Record<string, unknown>): WheelRecord {
+  const scores = parseWheelScores(
+    Object.fromEntries(
+      WHEEL_DIMENSIONS.map((d) => [d, row[WHEEL_COLUMNS[d]] ?? null]),
+    ),
+  );
+  if (!scores) throw new Error("WHEEL_BAD_VALUE"); // fail closed
+  const updatedAt =
+    row.updated_at instanceof Date
+      ? row.updated_at.toISOString()
+      : String(row.updated_at);
+  return {
+    scores,
+    updatedAt,
+    version: Number(row.version),
+    setByYou: Boolean(row.set_by_you),
+  };
+}
+
+export async function getWheelScores(
+  studentId: string,
+): Promise<WheelRecord | null | "not_found"> {
+  if (!isValidUuid(studentId)) return "not_found";
+  return withTeacherDb(async (c) => {
+    const stu = await c.query(
+      `SELECT 1 FROM public.students WHERE id = $1::uuid`,
+      [studentId],
+    );
+    if (stu.rowCount === 0) return "not_found";
+    const r = await c.query(
+      `SELECT ${WHEEL_RET}, set_by_teacher_id = public.current_teacher_id() AS set_by_you
+         FROM public.student_wheel_scores
+        WHERE student_id = $1::uuid`,
+      [studentId],
+    );
+    return r.rows[0] ? rowToWheelRecord(r.rows[0]) : null;
+  });
+}
+
+export async function saveWheelScores(
+  studentId: string,
+  req: { scores: WheelScores; expectedVersion: number | null },
+): Promise<WheelRecord | null> {
+  if (!isValidUuid(studentId)) return null;
+  return withTeacherDb(async (c) => {
+    const stu = await c.query<{ is_demo: boolean }>(
+      `SELECT is_demo FROM public.students WHERE id = $1::uuid`,
+      [studentId],
+    );
+    if (!stu.rows[0]) return null;
+    const vals = WHEEL_DIMENSIONS.map((d) => req.scores[d]);
+    const res =
+      req.expectedVersion === null
+        ? await c.query(
+            `INSERT INTO public.student_wheel_scores (student_id, ${WHEEL_COLS.join(", ")}, is_demo)
+             VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (student_id) DO NOTHING
+             RETURNING ${WHEEL_RET}, true AS set_by_you`,
+            [studentId, ...vals, stu.rows[0].is_demo],
+          )
+        : await c.query(
+            `UPDATE public.student_wheel_scores
+                SET ${WHEEL_COLS.map((col, i) => `${col} = $${i + 2}`).join(", ")},
+                    set_by_teacher_id = public.current_teacher_id(),
+                    version = version + 1
+              WHERE student_id = $1::uuid AND version = $7
+              RETURNING ${WHEEL_RET}, true AS set_by_you`,
+            [studentId, ...vals, req.expectedVersion],
+          );
+    if (res.rowCount === 0) throw new WheelVersionConflict();
+    await c.query(
+      `INSERT INTO public.events (teacher_id, name, payload, is_demo)
+       VALUES (public.current_teacher_id(), 'student.wheel_updated', $1::jsonb, $2)`,
+      [
+        JSON.stringify({
+          studentId,
+          setCount: vals.filter((v) => v !== null).length,
+        }),
+        stu.rows[0].is_demo,
+      ],
+    );
+    return rowToWheelRecord(res.rows[0]);
+  });
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -23,7 +125,7 @@ export async function getStudentProfile(
 ): Promise<StudentProfileSnapshot | null> {
   if (!isValidUuid(studentId)) return null;
 
-  return withTeacherDb(async (client) => {
+  const profile = await withTeacherDb(async (client) => {
     const stuRes = await client.query<{
       id: string;
       first_name: string;
@@ -42,13 +144,6 @@ export async function getStudentProfile(
     );
     const stu = stuRes.rows[0];
     if (!stu) return null;
-
-    const wheelRes = await client.query<{ item_id: string; option_id: string }>(
-      `SELECT item_id, option_id
-         FROM public.student_wheel_answers
-        WHERE student_id = $1::uuid`,
-      [studentId],
-    );
 
     const checkinRes = await client.query<{
       checkin_date: string;
@@ -151,6 +246,25 @@ export async function getStudentProfile(
       };
     };
 
+    let wheel: WheelLoad;
+    await client.query("SAVEPOINT wheel_load");
+    try {
+      const wRes = await client.query(
+        `SELECT ${WHEEL_RET}, set_by_teacher_id = public.current_teacher_id() AS set_by_you
+           FROM public.student_wheel_scores
+          WHERE student_id = $1::uuid`,
+        [studentId],
+      );
+      await client.query("RELEASE SAVEPOINT wheel_load");
+      wheel = {
+        status: "ok",
+        wheel: wRes.rows[0] ? rowToWheelRecord(wRes.rows[0]) : null,
+      };
+    } catch {
+      await client.query("ROLLBACK TO SAVEPOINT wheel_load").catch(() => {});
+      wheel = { status: "error" };
+    }
+
     return {
       studentId: stu.id,
       firstName: stu.first_name,
@@ -158,9 +272,7 @@ export async function getStudentProfile(
       packId: stu.pack_id ?? "pack_space",
       packLabel: stu.pack_label ?? "Space",
       equipped,
-      zones: buildWeaverWheel(
-        wheelRes.rows.map((w) => ({ itemId: w.item_id, optionId: w.option_id })),
-      ),
+      wheel,
       checkins,
       events,
       selThread: parseThread("sel"),
@@ -168,6 +280,8 @@ export async function getStudentProfile(
       currentPathToken: "demo-space-lesson",
     };
   });
+
+  return profile;
 }
 
 export async function saveStudentThread(

@@ -78,6 +78,10 @@ insert into public.student_wheel_answers (id, student_id, item_id, option_id) va
   ('55555555-5555-4555-8555-555555555502', 'dddddddd-dddd-4ddd-8ddd-dddddddddd01', 'partner', 'pairs')
 on conflict (student_id, item_id) do nothing;
 
+insert into public.student_wheel_scores (student_id, emotional_reg, focus, engagement, task_completion, social, set_by_teacher_id, is_demo) values
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddd01', 4, 3, 4, null, 5, '11111111-1111-4111-8111-111111111111', true)
+on conflict (student_id) do nothing;
+
 insert into public.student_sel_checkins (id, student_id, checkin_date, period, mood, level, teacher_note) values
   ('44444444-4444-4444-8444-444444444401', 'dddddddd-dddd-4ddd-8ddd-dddddddddd01', current_date, 'am', 'focused',    4, 'Ready for space fractions'),
   ('44444444-4444-4444-8444-444444444402', 'dddddddd-dddd-4ddd-8ddd-dddddddddd01', current_date, 'pm', 'frustrated', 2, 'Needed extra fraction tiles')

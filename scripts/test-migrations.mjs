@@ -394,6 +394,7 @@ await check("teacher B sees 0 rows across all tenant tables and cannot mutate te
       ["student_path_sessions", "select id from public.student_path_sessions"],
       ["block_events", "select id from public.block_events"],
       ["student_wheel_answers", "select id from public.student_wheel_answers"],
+      ["student_wheel_scores", "select student_id from public.student_wheel_scores"],
       ["student_sel_checkins", "select id from public.student_sel_checkins"],
       ["student_action_threads", "select id from public.student_action_threads"],
     ];
@@ -977,6 +978,88 @@ await check("save_student_path_session propagates is_demo and appends allowliste
 
   // Cleanup demo test student so subsequent assertions see clean state
   await db.query("delete from public.students where id = $1", [DEMO_STU]);
+});
+
+await check("student_wheel_scores enforces teacher-only RLS, 1-5 checks, at-least-one check, and set_by_teacher_id", async () => {
+  await asTeacher(db, TEACHER_A, async () => {
+    await refuses(
+      db,
+      "insert into public.student_wheel_scores (student_id, focus) values ($1, 6)",
+      [STUDENT_A],
+      "violates check constraint",
+    );
+    await refuses(
+      db,
+      "insert into public.student_wheel_scores (student_id) values ($1)",
+      [STUDENT_A],
+      "student_wheel_scores_at_least_one",
+    );
+    await refuses(
+      db,
+      "insert into public.student_wheel_scores (student_id, focus, set_by_teacher_id) values ($1, 4, $2)",
+      [STUDENT_A, TEACHER_B],
+      "row-level security",
+    );
+
+    await db.query(
+      "insert into public.student_wheel_scores (student_id, emotional_reg, focus) values ($1, 4, 3)",
+      [STUDENT_A],
+    );
+    const read = (
+      await db.query(
+        "select emotional_reg, focus, engagement, version from public.student_wheel_scores where student_id = $1",
+        [STUDENT_A],
+      )
+    ).rows[0];
+    if (!read || read.emotional_reg !== 4 || read.focus !== 3 || read.engagement !== null || read.version !== 1) {
+      throw new Error(`unexpected student_wheel_scores row: ${JSON.stringify(read)}`);
+    }
+
+    await db.query(
+      "update public.student_wheel_scores set focus = 5, version = version + 1 where student_id = $1",
+      [STUDENT_A],
+    );
+    const updated = (
+      await db.query(
+        "select focus, version from public.student_wheel_scores where student_id = $1",
+        [STUDENT_A],
+      )
+    ).rows[0];
+    if (updated?.focus !== 5 || updated?.version !== 2) {
+      throw new Error(`unexpected updated student_wheel_scores row: ${JSON.stringify(updated)}`);
+    }
+  });
+
+  await asTeacher(db, TEACHER_B, async () => {
+    const n = (
+      await db.query("select count(*)::int as n from public.student_wheel_scores where student_id = $1", [STUDENT_A])
+    ).rows[0].n;
+    if (n !== 0) throw new Error(`teacher B saw ${n} student_wheel_scores row(s)`);
+    await refuses(
+      db,
+      "insert into public.student_wheel_scores (student_id, focus) values ($1, 3)",
+      [STUDENT_A],
+      "row-level security",
+    );
+    const upd = await db.query(
+      "update public.student_wheel_scores set focus = 1 where student_id = $1",
+      [STUDENT_A],
+    );
+    if ((upd.affectedRows ?? 0) !== 0) {
+      throw new Error(`teacher B updated ${upd.affectedRows} student_wheel_scores row(s)`);
+    }
+  });
+
+  await asAnonApp(db, async () => {
+    const n = (await db.query("select count(*)::int as n from public.student_wheel_scores")).rows[0].n;
+    if (n !== 0) throw new Error(`unset session saw ${n} student_wheel_scores row(s)`);
+    await refuses(
+      db,
+      "insert into public.student_wheel_scores (student_id, focus, set_by_teacher_id) values ($1, 3, $2)",
+      [STUDENT_A, TEACHER_A],
+      "row-level security",
+    );
+  });
 });
 
 await check("db/seed.sql applies cleanly and passes assert_no_student_pii_columns()", async () => {

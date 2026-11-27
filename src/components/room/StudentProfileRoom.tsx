@@ -17,7 +17,7 @@ import {
 import { CheckInTrend } from "./profile/CheckInTrend";
 import { MasteryChart } from "./profile/MasteryChart";
 import { ProfileDrawer } from "./profile/ProfileDrawer";
-import { ProfileRadar } from "./profile/ProfileRadar";
+import { WeaverWheelPanel } from "./profile/WeaverWheelPanel";
 
 function useLiveProfile(initial: StudentProfileSnapshot): StudentProfileSnapshot {
   const [profile, setProfile] = useState<StudentProfileSnapshot>(initial);
@@ -87,6 +87,13 @@ export function StudentProfileRoom({
   const [selectedNode, setSelectedNode] = useState<MasteryNode | null>(null);
   const [zoom, setZoom] = useState<MasteryZoom>("day");
   const [filter, setFilter] = useState<MasteryFilter>("both");
+  const [wheelDirty, setWheelDirty] = useState(false);
+
+  const confirmLeaveIfDirty = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (wheelDirty && !window.confirm("Discard unsaved changes?")) {
+      e.preventDefault();
+    }
+  };
 
   const flaggedNode = useMemo(() => {
     if (!initialAlertEventId) return null;
@@ -101,7 +108,7 @@ export function StudentProfileRoom({
   }, [flaggedNode, selectedNode]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-8 text-[#f6f1ea]">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-3 py-6 text-[#f6f1ea] sm:px-6 sm:py-8">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
         <div className="flex items-center gap-4">
           <StudentAvatarHalo
@@ -123,29 +130,35 @@ export function StudentProfileRoom({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href={`/s/${profile.currentPathToken}?student=${profile.studentId}`}
             data-testid="view-current-blocks"
-            className="rounded-full bg-[#58b6fa] px-4 py-2 text-xs font-bold text-black hover:opacity-90"
+            onClick={confirmLeaveIfDirty}
+            className="inline-flex min-h-11 items-center rounded-full bg-[#58b6fa] px-4 py-2 text-xs font-bold text-black hover:opacity-90"
           >
             View Current Blocks ↗
           </Link>
           <Link
             href="/"
-            className="rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-[#f6f1ea] hover:bg-white/10"
+            onClick={confirmLeaveIfDirty}
+            className="inline-flex min-h-11 items-center rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-[#f6f1ea] hover:bg-white/10"
           >
             ← Room
           </Link>
         </div>
       </header>
 
-      <section className="rounded-[24px] border border-white/10 bg-[#111728] p-6">
+      <section className="rounded-[24px] border border-white/10 bg-[#111728] p-4 sm:p-6">
         <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[#8892b0]">
           SEL · Social-Emotional Learning
         </p>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_1px_minmax(0,1.2fr)]">
-          <ProfileRadar zones={profile.zones} />
+          <WeaverWheelPanel
+            studentId={profile.studentId}
+            initialWheel={profile.wheel}
+            onDirtyChange={setWheelDirty}
+          />
           <div className="hidden bg-white/10 lg:block" aria-hidden="true" />
           <CheckInTrend
             checkins={profile.checkins}

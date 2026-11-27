@@ -1,6 +1,7 @@
 import { isStruggleEvent } from "@/domain/config/weaver-config";
 import type { EquippedLoadout } from "@/lib/collectibles/catalog";
 import { scanForPii } from "@/lib/security/pii";
+import type { WheelLoad } from "./wheel";
 
 export type WheelAnswer = {
   itemId: string;
@@ -86,7 +87,7 @@ export type StudentProfileSnapshot = {
   packId: string;
   packLabel: string;
   equipped: EquippedLoadout;
-  zones: RadarZone[];
+  wheel: WheelLoad;
   checkins: SelCheckIn[];
   events: BlockEventRecord[];
   selThread: ActionThreadRecord | null;
