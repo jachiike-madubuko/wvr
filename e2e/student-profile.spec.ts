@@ -60,8 +60,16 @@ test("renders Maya profile with Bklit Weaver Wheel, Check-ins, Mastery chart, an
   );
   await page.getByTestId("filter-both").click();
 
-  // Click PM check-in dip -> SEL Action Chat drawer + PII gate check
-  await page.getByTestId("checkin-btn-pm").click();
+  // Redundant pill buttons under the Daily Check-ins chart are removed; hit points live inside the SVG
+  await expect(page.locator('[data-testid="checkin-trend"] button')).toHaveCount(0);
+
+  // Click PM check-in dip SVG hit point -> SEL Action Chat drawer + PII gate check
+  const dipPoint = page
+    .locator('[data-testid="checkin-trend"] svg [data-testid^="checkin-point-"][data-kind="dip"]')
+    .first();
+  await expect(dipPoint).toHaveAttribute("role", "button");
+  await expect(dipPoint).toHaveAttribute("tabindex", "0");
+  await dipPoint.click();
   const drawer = page.getByTestId("profile-drawer");
   await expect(drawer).toBeVisible();
   await expect(drawer).toContainText("SEL Action Chat");

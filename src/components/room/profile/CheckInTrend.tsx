@@ -95,13 +95,18 @@ export function CheckInTrend({
             />
             <ChartHitPoints
               items={series.points.map((pt) => {
-                const row = series.rows.find((r) => r.dateText === pt.date);
+                const rowIndex = series.rows.findIndex((r) => r.dateText === pt.date);
+                const row = rowIndex >= 0 ? series.rows[rowIndex] : undefined;
+                const isSelected = selectedId === pt.id;
                 return {
                   id: `checkin-${pt.id}`,
+                  testId: `checkin-point-${pt.id}`,
+                  dataIndex: rowIndex >= 0 ? rowIndex : undefined,
+                  flagged: isSelected,
                   date: row?.date ?? new Date(),
                   y: pt.y,
                   color: pt.period === "am" ? MINT : CORAL,
-                  radius: pt.isDip ? 7 : 5,
+                  radius: isSelected ? 8 : pt.isDip ? 7 : 5,
                   ariaLabel: `${pt.date} ${pt.period.toUpperCase()} ${pt.mood}`,
                   kind: pt.isDip ? "dip" : "ok",
                   payload: pt,
@@ -111,25 +116,6 @@ export function CheckInTrend({
             />
           </LineChart>
         </div>
-      </div>
-
-      <div className="mt-2 flex flex-wrap gap-2">
-        {series.points.map((pt) => (
-          <button
-            key={pt.id}
-            type="button"
-            data-testid={`checkin-btn-${pt.period}`}
-            aria-pressed={selectedId === pt.id}
-            onClick={() => onSelect(pt)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-              pt.isDip
-                ? "border-[#f87171]/40 bg-[#f87171]/15 text-[#f87171]"
-                : "border-white/10 bg-white/5 text-[#cbd5e1]"
-            }`}
-          >
-            {pt.period.toUpperCase()} · {pt.mood}
-          </button>
-        ))}
       </div>
     </div>
   );

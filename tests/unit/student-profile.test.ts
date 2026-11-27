@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
+import { CheckInTrend } from "@/components/room/profile/CheckInTrend";
 import { MasteryChart } from "@/components/room/profile/MasteryChart";
 import {
   buildCheckInSeries,
@@ -156,4 +157,28 @@ test("MasteryChart omits redundant pill button row and renders focusable SVG hit
   expect(html).toContain('data-testid="mastery-node-ev-1"');
   expect(html).toContain('data-testid="mastery-node-ev-2"');
   expect(html).toMatch(/<circle[^>]*role="button"[^>]*tabindex="0"[^>]*data-testid="mastery-node-ev-2"/);
+});
+
+test("CheckInTrend omits redundant pill button row and renders focusable SVG hit points", () => {
+  const html = renderToStaticMarkup(
+    createElement(CheckInTrend, {
+      checkins: [
+        { date: "2026-11-23", period: "am", mood: "focused", level: 4, teacherNote: "Ready" },
+        { date: "2026-11-23", period: "pm", mood: "frustrated", level: 2, teacherNote: "Needed tiles" },
+      ],
+      selectedId: "2026-11-23-pm",
+      onSelect: () => {},
+    }),
+  );
+
+  // Pill buttons under the chart must not render
+  expect(html).not.toMatch(/<button[^>]*data-testid="checkin-btn-/);
+  expect(html).not.toContain("AM · focused");
+  expect(html).not.toContain("PM · frustrated");
+  // SVG hit points carry testid, role="button", tabindex="0", kind, and selection feedback
+  expect(html).toContain('data-testid="checkin-point-2026-11-23-am"');
+  expect(html).toContain('data-testid="checkin-point-2026-11-23-pm"');
+  expect(html).toMatch(
+    /<circle[^>]*role="button"[^>]*tabindex="0"[^>]*data-testid="checkin-point-2026-11-23-pm"[^>]*data-kind="dip"[^>]*data-flagged="true"/,
+  );
 });
