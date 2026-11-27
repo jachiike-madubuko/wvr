@@ -108,23 +108,28 @@ export function ProfileDrawer({
     }
   };
 
-  const misconceptionText =
-    selectedNode?.misconception ??
-    ivThread?.approvedPlan?.misconception ??
-    "unequal parts";
+  const selectedMisconception = selectedNode?.misconception ?? null;
+  const savedPlan = ivThread?.approvedPlan ?? null;
+  const savedMatchesNode =
+    savedPlan !== null &&
+    (selectedMisconception === null ||
+      savedPlan.misconception === selectedMisconception ||
+      savedPlan.misconception.startsWith(`${selectedMisconception} · `));
 
-  const activePlan: ApprovedOfflinePlan = {
-    misconception: misconceptionText,
-    steps:
-      ivThread?.approvedPlan &&
-      ivThread.approvedPlan.misconception === misconceptionText
-        ? ivThread.approvedPlan.steps
-        : [
-            `1. Manipulative Check: Work side-by-side with ${firstName} using physical paper strips to model "${misconceptionText}".`,
-            `2. Partner Scaffolding: Pair ${firstName} for a 1-minute verbal comparison.`,
-            `3. Quick Check: 2 oral exit prompts offline before resuming.`,
-          ],
-  };
+  const misconceptionText = savedMatchesNode
+    ? savedPlan.misconception
+    : (selectedMisconception ?? "unequal parts");
+
+  const activePlan: ApprovedOfflinePlan = savedMatchesNode
+    ? savedPlan
+    : {
+        misconception: misconceptionText,
+        steps: [
+          `1. Manipulative Check: Work side-by-side with ${firstName} using physical paper strips to model "${misconceptionText}".`,
+          `2. Partner Scaffolding: Pair ${firstName} for a 1-minute verbal comparison.`,
+          `3. Quick Check: 2 oral exit prompts offline before resuming.`,
+        ],
+      };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-xs">

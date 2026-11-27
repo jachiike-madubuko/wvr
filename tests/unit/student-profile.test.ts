@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
 import { CheckInTrend } from "@/components/room/profile/CheckInTrend";
 import { MasteryChart } from "@/components/room/profile/MasteryChart";
+import { ProfileDrawer } from "@/components/room/profile/ProfileDrawer";
 import {
   buildCheckInSeries,
   buildMasteryNodes,
@@ -181,4 +182,44 @@ test("CheckInTrend omits redundant pill button row and renders focusable SVG hit
   expect(html).toMatch(
     /<circle[^>]*role="button"[^>]*tabindex="0"[^>]*data-testid="checkin-point-2026-11-23-pm"[^>]*data-kind="dip"[^>]*data-flagged="true"/,
   );
+});
+
+test("ProfileDrawer preserves rule-based fallback plan when misconception carries fallback suffix", () => {
+  const focus = "Simulated LLM API 500 / Timeout trigger";
+  const fallbackPlan = buildOfflineCoachingPlan({
+    firstName: "Pulsar",
+    misconception: focus,
+  });
+
+  const html = renderToStaticMarkup(
+    createElement(ProfileDrawer, {
+      mode: "iv",
+      studentId: "11111111-1111-4111-8111-111111111111",
+      firstName: "Pulsar",
+      selectedCheckIn: null,
+      selectedNode: {
+        id: "ev-pulsar",
+        label: "math (math)",
+        subject: "math",
+        durationSec: 210,
+        attempts: 4,
+        kind: "struggle",
+        misconception: focus,
+        dimmed: false,
+        at: "2026-11-23T15:10:00Z",
+      },
+      selThread: null,
+      ivThread: {
+        kind: "iv",
+        messages: [],
+        approvedPlan: fallbackPlan,
+        teacherApprovedAt: null,
+      },
+      onClose: () => {},
+      onThreadUpdated: () => {},
+    }),
+  );
+
+  expect(html).toContain("Rule-based fallback active");
+  expect(html).toContain("Static Fallback");
 });
