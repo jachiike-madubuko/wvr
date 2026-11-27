@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, test } from "vitest";
+import { selectVisibleTicks } from "@/components/charts/x-axis";
 import { CheckInTrend } from "@/components/room/profile/CheckInTrend";
 import { MasteryChart } from "@/components/room/profile/MasteryChart";
 import { ProfileDrawer } from "@/components/room/profile/ProfileDrawer";
@@ -222,4 +223,42 @@ test("ProfileDrawer preserves rule-based fallback plan when misconception carrie
 
   expect(html).toContain("Rule-based fallback active");
   expect(html).toContain("Static Fallback");
+});
+
+test("selectVisibleTicks prunes clustered right-edge XAxis labels, truncates long names, and anchors edges inside bounds", () => {
+  const innerWidth = 860;
+  const clustered = selectVisibleTicks(
+    [
+      { x: 0, label: "hook (hook)" },
+      { x: 390, label: "math (math)" },
+      { x: 740, label: "cont_equal_halves (math)" },
+      { x: 800, label: "ela (ela)" },
+      { x: 825, label: "science (science)" },
+      { x: 842, label: "art (art)" },
+      { x: 860, label: "cont_make_ten (math)" },
+    ],
+    innerWidth,
+  );
+
+  expect(clustered[0]?.anchor).toBe("start");
+  expect(clustered[0]?.left).toBeGreaterThanOrEqual(0);
+  expect(clustered[clustered.length - 1]?.anchor).toBe("end");
+  expect(clustered[clustered.length - 1]?.right).toBeLessThanOrEqual(innerWidth);
+  for (const t of clustered) {
+    expect(t.label.length).toBeLessThanOrEqual(16);
+  }
+  expect(clustered.some((t) => t.label.endsWith("…"))).toBe(true);
+  for (let i = 1; i < clustered.length; i++) {
+    expect(clustered[i]!.left - clustered[i - 1]!.right).toBeGreaterThanOrEqual(14);
+  }
+
+  const checkins = selectVisibleTicks(
+    [
+      { x: 0, label: "Nov 24" },
+      { x: 240, label: "Nov 25" },
+      { x: 480, label: "Nov 26" },
+    ],
+    480,
+  );
+  expect(checkins.map((t) => t.label)).toEqual(["Nov 24", "Nov 25", "Nov 26"]);
 });

@@ -45,9 +45,31 @@ test("renders Maya profile with Bklit Weaver Wheel, Check-ins, Mastery chart, an
     await expect(radar).toContainText(label);
   }
 
-  // Check-ins & Mastery charts render SVGs
+  // Check-ins & Mastery charts render SVGs with non-overlapping, unclipped X-axis labels
   await expect(page.getByTestId("checkin-trend").locator("svg")).toBeVisible();
   await expect(page.getByTestId("mastery-chart").locator("svg")).toBeVisible();
+
+  for (const chartId of ["checkin-trend", "mastery-chart"] as const) {
+    const svgBox = await page.getByTestId(chartId).locator("svg").boundingBox();
+    expect(svgBox).not.toBeNull();
+    const tickLoc = page.locator(
+      `[data-testid="${chartId}"] [data-testid="chart-x-axis"] text`,
+    );
+    const tickCount = await tickLoc.count();
+    expect(tickCount).toBeGreaterThanOrEqual(1);
+    const boxes = [];
+    for (let i = 0; i < tickCount; i++) {
+      const b = await tickLoc.nth(i).boundingBox();
+      expect(b).not.toBeNull();
+      expect(b!.x).toBeGreaterThanOrEqual(svgBox!.x - 2);
+      expect(b!.x + b!.width).toBeLessThanOrEqual(svgBox!.x + svgBox!.width + 2);
+      boxes.push(b!);
+    }
+    boxes.sort((a, b) => a.x - b.x);
+    for (let i = 1; i < boxes.length; i++) {
+      expect(boxes[i]!.x).toBeGreaterThanOrEqual(boxes[i - 1]!.x + boxes[i - 1]!.width + 4);
+    }
+  }
 
   // Zoom & Filter pills work
   await page.getByTestId("zoom-week").click();
