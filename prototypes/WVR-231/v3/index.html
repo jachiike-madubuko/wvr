@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>WVR-231 · v3 · Mnemonic-first bag</title>
+<style>
+:root{--page:#0b1020;--panel:#111728;--text:#f6f1ea;--muted:#8892b0;--accent:#58b6fa;--err:#ff7a7a;--line:rgba(255,255,255,.1);--proto:#f2c14e}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+button{font:inherit;color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+.muted{color:var(--muted)}
+h1{font-size:24px;margin:2px 0 0}
+h2{font-size:17px;margin:0 0 4px}
+p{margin:0}
+/* proto chrome */
+.proto{background:repeating-linear-gradient(135deg,#1a1a10 0 10px,#15150d 10px 20px);border-bottom:2px dashed var(--proto)}
+.proto-in{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-top:10px;padding-bottom:10px}
+.proto-label{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--proto);margin-right:4px;white-space:nowrap}
+.pbtn{min-height:36px;padding:0 12px;border:1px dashed var(--proto);background:#20200f;border-radius:6px;font:500 13px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#f3e3b0;cursor:pointer;white-space:nowrap}
+.pbtn[aria-pressed="true"]{background:var(--proto);color:#1a1405;border-style:solid}
+.pbtn:hover{filter:brightness(1.15)}
+.seg{display:flex;gap:8px}
+.proto-msg{font:12px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#f3e3b0;min-width:0;flex:1 1 220px}
+/* header + banner */
+.top{padding:18px 0 10px}
+.eyebrow{font-size:12px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.banner{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 14px;color:var(--muted);font-size:13px;background:rgba(255,255,255,.02)}
+.banner-text{flex:1;min-width:0;padding-top:6px}
+.banner.collapsed .banner-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.banner-tog{flex:none;min-height:36px;min-width:84px;border:1px solid var(--line);background:transparent;border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px}
+.tests{color:var(--muted);font-size:13px;margin:10px 0 16px}
+main{padding-bottom:16px}
+.foot{color:var(--muted);font-size:12px;padding:12px 0 28px;border-top:1px solid var(--line)}
+/* shared */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:20px}
+.btn{min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:transparent;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:disabled{cursor:not-allowed;opacity:.55}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#06121f}
+.btn.ghost{color:var(--text)}
+.btn:focus-visible,.pbtn:focus-visible,.opt:focus-visible,.tile:focus-visible,.tbadge:focus-visible,.banner-tog:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tag{display:inline-block;font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px;vertical-align:middle;white-space:nowrap}
+.name{font-weight:700;font-size:18px}
+.idrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-bottom:16px}
+.today{margin-left:auto;font-size:14px;color:var(--text);background:rgba(88,182,250,.1);border:1px solid rgba(88,182,250,.3);padding:6px 12px;border-radius:999px;white-space:nowrap}
+.grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:20px;align-items:start}
+.col{display:grid;gap:20px}
+/* bag */
+.bag-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+.tile{position:relative;border:1px solid var(--line);border-radius:16px;padding:12px;background:rgba(255,255,255,.02);min-height:150px;display:flex;flex-direction:column;gap:6px;text-align:left}
+.tile .ico{width:44px;height:44px}
+.tile .iname{font-weight:700;font-size:14px}
+.tile .memo{font-size:13px;color:var(--text);opacity:.9}
+.tile.locked{border-style:dashed;opacity:.55}
+.tile.locked .iname{font-weight:500;color:var(--muted)}
+.eqtag{position:absolute;top:10px;right:10px;font-size:11px;font-weight:700;color:#06121f;background:var(--accent);border-radius:999px;padding:2px 8px}
+.tile.eq{border-color:rgba(88,182,250,.55)}
+/* avatar */
+.av-box{display:flex;gap:16px;align-items:center;margin-top:12px}
+.av{width:180px;height:210px;flex:none;border-radius:16px;overflow:hidden;border:1px solid var(--line)}
+.av-meta{display:grid;gap:6px;font-size:14px;min-width:0}
+/* request */
+.req h2{display:flex;align-items:center;gap:8px}
+.kv{display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:600;white-space:nowrap}
+.chip.cur{border-color:rgba(88,182,250,.5)}
+.opts{display:grid;gap:8px;margin:10px 0 14px}
+.opt{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:transparent;cursor:pointer;text-align:left;width:100%}
+.opt[aria-checked="true"]{border-color:var(--accent);background:rgba(88,182,250,.08)}
+.opt:disabled{cursor:not-allowed;opacity:.5}
+.opt .dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted);flex:none}
+.opt[aria-checked="true"] .dot{border-color:var(--accent);background:var(--accent)}
+.opt .why{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.note{border-radius:14px;padding:10px 14px;font-size:14px;margin:10px 0;border:1px solid var(--line)}
+.note.wait{border-color:rgba(242,193,78,.45);background:rgba(242,193,78,.07)}
+.note.sched{border-color:rgba(88,182,250,.45);background:rgba(88,182,250,.07)}
+.note.deny{border-color:rgba(255,122,122,.45);background:rgba(255,122,122,.06)}
+.note.done{border-color:rgba(126,224,161,.45);background:rgba(126,224,161,.06)}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+/* teacher */
+.tgrid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px;align-items:start}
+.ring{width:100%;max-width:420px;height:auto;display:block;margin:10px auto 0}
+.roster{display:grid;gap:10px;margin-top:12px}
+.srow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.srow .sint{color:var(--muted);font-size:14px}
+.tbadge{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--err);background:rgba(255,122,122,.12);color:var(--text);font-weight:700;cursor:pointer;white-space:nowrap}
+.tbadge .adot{width:10px;height:10px;border-radius:50%;background:var(--err);box-shadow:0 0 0 3px rgba(255,122,122,.25)}
+.shint{margin-left:auto;font-size:13px;color:var(--muted);border:1px dashed var(--line);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.toast{font-size:14px;color:var(--muted);margin-top:12px;min-height:20px}
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(3,6,14,.72);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10}
+.scrim[hidden]{display:none}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:22px;width:min(460px,100%)}
+.modal.wide{width:min(600px,100%)}
+.mhead{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.mhead h2{flex:1;margin:0;font-size:19px}
+.mx{min-height:40px;min-width:72px}
+.mfacts{display:grid;gap:8px;margin:12px 0 16px;font-size:15px}
+.mfacts .row{display:flex;gap:10px;align-items:center}
+.mfacts .k{color:var(--muted);width:150px;flex:none}
+.mnote{color:var(--muted);font-size:12px;margin-top:12px}
+.mact{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn.approve{color:var(--accent);border:2px solid var(--accent);background:rgba(88,182,250,.06)}
+.btn.deny{color:var(--err);border:2px solid var(--err);background:rgba(255,122,122,.06)}
+.sbs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0 16px}
+.sbs figure{margin:0;border:1px solid var(--line);border-radius:14px;padding:10px;font-size:13px}
+.sbs figcaption{margin-top:6px;color:var(--muted)}
+.swatch{display:block;width:100%;height:80px;border-radius:10px}
+.variant-v3 .grid2{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}
+.variant-v3 .bag-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.variant-v3 .tile{min-height:120px;padding:16px;cursor:pointer;font:inherit;color:inherit;background:rgba(255,255,255,.02)}
+.variant-v3 .tile .memo{font-size:19px;font-weight:700;line-height:1.3;order:1;padding-right:64px}
+.variant-v3 .tile .iname{font-size:13px;font-weight:500;color:var(--muted);order:2}
+.variant-v3 .tile .ico{width:36px;height:36px;order:0}
+.variant-v3 .tile.locked{min-height:72px;cursor:default}
+.variant-v3 .tile.sel{border:2px solid var(--proto);box-shadow:0 0 0 4px rgba(242,193,78,.12)}
+.variant-v3 .req{background:transparent}
+.variant-v3 .req h2{font-size:15px;color:var(--muted)}
+.selmemo{border:1px dashed rgba(242,193,78,.55);border-radius:14px;padding:10px 12px;font-size:14px;margin-top:12px}
+.selmemo .lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--proto)}
+.selmemo .btn{min-height:40px;margin-top:8px}
+.variant-v3 .tile.locked .memo{font-size:13px;font-weight:500}
+
+</style>
+</head>
+<body class="variant-v3">
+<div class="proto" role="region" aria-label="Proto controls (prototype only, not app UI)">
+  <div class="wrap proto-in">
+    <span class="proto-label">Proto controls · prototype only</span>
+    <div class="seg" role="group" aria-label="Prototype view switch">
+      <button type="button" class="pbtn" id="viewStudent" data-act="view" data-view="student">Student view</button>
+      <button type="button" class="pbtn" id="viewTeacher" data-act="view" data-view="teacher">Teacher view</button>
+    </div>
+    <button type="button" class="pbtn" id="delayBtn" data-act="delay" title="Stand-in for the later boundary (OQ-13). Applies only an already-approved change.">Trigger delayed transition (stand-in)</button>
+    <button type="button" class="pbtn" id="resetBtn" data-act="reset">Reset demo</button>
+    <span id="protoMsg" class="proto-msg" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">WVR-231 · v3 · Mnemonic-first bag</p>
+    <h1 id="viewTitle">Student view</h1>
+  </header>
+  <div class="banner" id="banner">
+    <p class="banner-text" id="bannerText">Proposed defaults, not decided: see Open questions in stories.md. This file is a prototype, not the app.</p>
+    <button type="button" class="banner-tog" id="bannerTog" data-act="banner" aria-expanded="true" aria-controls="bannerText">Collapse</button>
+  </div>
+  <p class="tests">Tests: larger tiles with the memory line as the main text; the request panel is secondary. v3-only extra: select an item to highlight its memory and see a temporary dashed look on the avatar. Nothing equipped changes. Does the bag read as a memory aid?</p>
+  <main>
+    <section id="student" aria-label="Student view"></section>
+    <section id="teacher" aria-label="Teacher view" hidden></section>
+  </main>
+  <footer class="foot">Prototype: saved on this device only.</footer>
+</div>
+<div id="scrim" class="scrim" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div>
+</div>
+<script>
+(function(){
+'use strict';
+var V = 'v3';
+var KEY = 'wvr231:' + V + ':state';
+// Fixture data (proposed, see stories.md OQ-2, OQ-5, OQ-6, OQ-12)
+var ITEMS = [
+  {id:'helmet', name:'Number Helmet', memo:'Mastered 10s addition', color:'#58b6fa'},
+  {id:'badge', name:'Planet Badge', memo:'Matched the planets to their names', color:'#f2c14e'},
+  {id:'visor', name:'Comeback Visor', memo:'Kept going after 3 misses', color:'#c59bff'},
+  {id:'boots', name:'Streak Boots', memo:'Answered 3 in a row on the first try', color:'#7ee0a1'},
+  {id:'gloves', name:'Word Gloves', locked:true},
+  {id:'cape', name:'Social Cape', locked:true},
+  {id:'brush', name:'Art Brush', locked:true},
+  {id:'star', name:'Traveler Star', locked:true}
+];
+var EQUIPPED = ['helmet','badge']; // seeded; the loop never changes this
+var LABEL = {space:'Space', ocean:'Ocean', plants:'Plants', ballet:'Ballet', past:'Digging up the past'};
+var ADJ = {space:'ocean', ocean:'space'}; // one adjacent destination offered (fixture)
+var NONADJ = 'plants'; // visible, disabled, never submittable
+function seed(){ return {interest:'space', request:null, last:null, view:'student'}; }
+function load(){
+  try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && LABEL[s.interest]) return s; } catch(e) {}
+  return seed();
+}
+var S = load();
+var ui = {preview:false, sel:null, choice:null, toast:'', modal:false};
+function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
+function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function $(id){ return document.getElementById(id); }
+function item(id){ for (var i=0;i<ITEMS.length;i++) if (ITEMS[i].id===id) return ITEMS[i]; }
+function protoMsg(t){ $('protoMsg').textContent = t || ''; }
+
+// ---------- drawing ----------
+function skinDefs(skin, idp){
+  if (skin === 'ocean') return '<linearGradient id="'+idp+'g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e4d6b"/><stop offset="1" stop-color="#06283d"/></linearGradient>';
+  return '<linearGradient id="'+idp+'g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1640"/><stop offset="1" stop-color="#0a0c1f"/></linearGradient>';
+}
+function skinDecor(skin){
+  if (skin === 'ocean') return '<path d="M0 60 q15 -8 30 0 t30 0 t30 0 t30 0 t30 0 t30 0" stroke="#5fd3e6" stroke-opacity=".35" fill="none" stroke-width="3"/><path d="M0 110 q15 -8 30 0 t30 0 t30 0 t30 0 t30 0 t30 0" stroke="#5fd3e6" stroke-opacity=".25" fill="none" stroke-width="3"/><circle cx="150" cy="30" r="4" fill="#9fe7f2" fill-opacity=".5"/><circle cx="160" cy="44" r="3" fill="#9fe7f2" fill-opacity=".4"/>';
+  return '<circle cx="20" cy="24" r="1.6" fill="#fff"/><circle cx="150" cy="18" r="1.4" fill="#fff"/><circle cx="160" cy="80" r="1.2" fill="#fff"/><circle cx="30" cy="120" r="1.3" fill="#fff"/><circle cx="140" cy="150" r="1.5" fill="#fff"/><circle cx="148" cy="44" r="14" fill="#7b5cff" fill-opacity=".45"/>';
+}
+function scene(skin, w, h, idp){
+  return '<svg class="swatch" viewBox="0 0 180 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>'+skinDefs(skin,idp)+'</defs><rect width="180" height="120" fill="url(#'+idp+'g)"/>'+skinDecor(skin)+'</svg>';
+}
+// item shapes, in avatar coords (180x210)
+var SHAPE = {
+  helmet: function(c,ghost){ return '<path d="M62 62 a28 28 0 0 1 56 0 v6 h-56z" '+paint(c,ghost)+'/>'; },
+  visor:  function(c,ghost){ return '<rect x="66" y="66" width="48" height="10" rx="5" '+paint(c,ghost)+'/>'; },
+  badge:  function(c,ghost){ return '<circle cx="104" cy="118" r="9" '+paint(c,ghost)+'/><circle cx="104" cy="118" r="4" fill="none" stroke="#0b1020" stroke-width="2" opacity="'+(ghost?0:1)+'"/>'; },
+  boots:  function(c,ghost){ return '<rect x="66" y="182" width="22" height="14" rx="4" '+paint(c,ghost)+'/><rect x="92" y="182" width="22" height="14" rx="4" '+paint(c,ghost)+'/>'; }
+};
+var CENTER = {helmet:[90,52,34], visor:[90,71,30], badge:[104,118,16], boots:[90,189,32]};
+function paint(c, ghost){ return ghost ? 'fill="none" stroke="'+c+'" stroke-width="2.5" stroke-dasharray="5 4"' : 'fill="'+c+'"'; }
+function icon(it){
+  if (it.locked) return '<svg class="ico" viewBox="0 0 44 44" aria-hidden="true"><rect x="4" y="4" width="36" height="36" rx="10" fill="none" stroke="#8892b0" stroke-dasharray="4 4"/><rect x="16" y="21" width="12" height="10" rx="2" fill="#8892b0"/><path d="M18 21 v-3 a4 4 0 0 1 8 0 v3" fill="none" stroke="#8892b0" stroke-width="2"/></svg>';
+  var p = {helmet:'<path d="M8 30 a14 14 0 0 1 28 0 v4 h-28z" fill="'+it.color+'"/>',
+           badge:'<circle cx="22" cy="22" r="13" fill="'+it.color+'"/><circle cx="22" cy="22" r="6" fill="none" stroke="#0b1020" stroke-width="3"/>',
+           visor:'<rect x="6" y="17" width="32" height="10" rx="5" fill="'+it.color+'"/>',
+           boots:'<rect x="6" y="20" width="14" height="14" rx="4" fill="'+it.color+'"/><rect x="24" y="20" width="14" height="14" rx="4" fill="'+it.color+'"/>'}[it.id];
+  return '<svg class="ico" viewBox="0 0 44 44" aria-hidden="true">'+p+'</svg>';
+}
+function avatar(){
+  var skin = S.interest, s = '';
+  s += '<svg class="av" viewBox="0 0 180 210" role="img" aria-label="Avatar wearing '+EQUIPPED.map(function(i){return item(i).name;}).join(' and ')+' on the '+LABEL[skin]+' skin"><defs>'+skinDefs(skin,'av')+'</defs>';
+  s += '<rect width="180" height="210" fill="url(#avg)"/>'+skinDecor(skin);
+  s += '<circle cx="90" cy="70" r="24" fill="#e8c6a0"/><rect x="62" y="98" width="56" height="64" rx="18" fill="#3a4a7a"/><rect x="70" y="160" width="16" height="26" rx="6" fill="#2a355c"/><rect x="94" y="160" width="16" height="26" rx="6" fill="#2a355c"/>';
+  s += '<circle cx="82" cy="72" r="2.5" fill="#1b1b1b"/><circle cx="98" cy="72" r="2.5" fill="#1b1b1b"/>';
+  EQUIPPED.forEach(function(id){ s += SHAPE[id](item(id).color, false); });
+  if (V === 'v3' && ui.sel) {
+    var it = item(ui.sel), c = CENTER[ui.sel];
+    if (EQUIPPED.indexOf(ui.sel) >= 0) s += '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="'+c[2]+'" fill="none" stroke="#f2c14e" stroke-width="2.5" stroke-dasharray="4 4"/>';
+    else s += SHAPE[ui.sel](it.color, true);
+  }
+  return s + '</svg>';
+}
+
+// ---------- student ----------
+function dest(){ return ADJ[S.interest]; }
+function student(){
+  var cur = LABEL[S.interest], h = '';
+  h += '<div class="idrow"><span class="name">Student A</span><span class="tag">Prototype pseudonym</span>';
+  h += '<span class="today" id="today">Today\'s work: '+esc(cur)+' packet</span></div>';
+  h += '<div class="grid2"><section class="panel bag" aria-labelledby="bagH"><h2 id="bagH">Trophy Bag</h2><p class="muted">'+(V==='v3'?'Each item is a memory of something you learned. ':'')+'4 of 8 unlocked</p><div class="bag-grid" id="bagGrid">';
+  ITEMS.forEach(function(it){
+    var eq = EQUIPPED.indexOf(it.id) >= 0;
+    var cls = 'tile' + (it.locked?' locked':'') + (eq?' eq':'') + (ui.sel===it.id?' sel':'');
+    var inner = icon(it) + '<span class="iname">'+esc(it.name)+'</span>' + (it.locked ? '<span class="memo muted">Locked</span>' : '<span class="memo">'+esc(it.memo)+'</span>') + (eq?'<span class="eqtag">Equipped</span>':'');
+    if (V === 'v3' && !it.locked) h += '<button type="button" class="'+cls+'" data-act="sel" data-id="'+it.id+'" aria-pressed="'+(ui.sel===it.id)+'" data-item="'+it.id+'">'+inner+'</button>';
+    else h += '<div class="'+cls+'" data-item="'+it.id+'">'+inner+'</div>';
+  });
+  h += '</div></section><div class="col">';
+  h += '<section class="panel avatar" aria-labelledby="avH"><h2 id="avH">Avatar preview</h2><div class="av-box">'+avatar()+'<div class="av-meta"><p id="wearing"><span class="muted">Wearing:</span> '+EQUIPPED.map(function(i){return esc(item(i).name);}).join(', ')+'</p><p><span class="muted">Interest skin:</span> <span id="skinLbl">'+esc(cur)+'</span></p></div></div>';
+  if (V === 'v3' && ui.sel) {
+    var si = item(ui.sel), iseq = EQUIPPED.indexOf(ui.sel) >= 0;
+    h += '<div class="selmemo" id="selMemo"><p class="lbl">'+(iseq?'Memory highlight':'Preview only · not equipped')+'</p><p><strong>'+esc(si.memo)+'</strong> <span class="muted">('+esc(si.name)+')</span></p><p class="muted">'+(iseq?'Already worn. Nothing changes.':'Dashed outline is a look only. What you wear does not change.')+'</p><button type="button" class="btn ghost" data-act="sel" data-id="'+ui.sel+'">Clear preview</button></div>';
+  }
+  h += '</section>';
+  h += requestPanel();
+  h += '</div></div>';
+  return h;
+}
+function requestPanel(){
+  var cur = LABEL[S.interest], d = dest(), dl = LABEL[d], r = S.request, h = '';
+  h += '<section class="panel req" id="reqPanel" aria-labelledby="reqH"><h2 id="reqH">'+(V==='v3'?'Want a different interest?':'Change interest')+'</h2>';
+  h += '<div class="kv"><span class="muted">Current interest</span><span class="chip cur" id="curInterest">'+esc(cur)+'</span></div>';
+  var busy = !!r, choice = ui.choice || d;
+  if (r && r.status === 'pending') h += '<div class="note wait" id="reqStatus" role="status"><strong>Waiting for your teacher.</strong> You asked to move from '+esc(cur)+' to '+esc(LABEL[r.to])+'. You stay on '+esc(cur)+' for today\'s work.</div>';
+  else if (r && r.status === 'scheduled') h += '<div class="note sched" id="reqStatus" role="status"><strong>Your teacher said yes to '+esc(LABEL[r.to])+'. It does not apply yet.</strong> You finish today\'s work on '+esc(cur)+' first. The change comes later (stand-in timing, not decided).</div>';
+  else if (S.last === 'denied') h += '<div class="note deny" id="reqStatus" role="status"><strong>Your teacher said not now.</strong> You are still on '+esc(cur)+'. You can ask again.</div>';
+  else if (S.last === 'applied') h += '<div class="note done" id="reqStatus" role="status"><strong>You moved to '+esc(cur)+'.</strong> Your approved change has applied.</div>';
+  h += '<p class="muted" style="font-size:14px">Ask to move to an interest next to yours:</p><div class="opts" role="radiogroup" aria-label="Destination interest">';
+  h += '<button type="button" class="opt" role="radio" aria-checked="'+(choice===d)+'" data-act="choose" data-to="'+d+'" id="optAdj"'+(busy?' disabled aria-disabled="true"':'')+'><span class="dot"></span>'+esc(dl)+'<span class="why">Next to '+esc(cur)+'</span></button>';
+  h += '<button type="button" class="opt" role="radio" aria-checked="false" disabled aria-disabled="true" id="optNon" data-to="'+NONADJ+'"><span class="dot"></span>'+esc(LABEL[NONADJ])+'<span class="why">Not next to '+esc(cur)+', can\'t ask</span></button></div>';
+  if (V === 'v2') {
+    h += '<p class="delaynote" id="delayNote">If your teacher says yes, the change does not happen right away. You finish today\'s work first (stand-in wording).</p>';
+    if (ui.preview) h += '<div class="dpv" id="destPreview">'+scene(d,180,120,'dp')+'<div><p class="lbl">Look preview only · not applied</p><p>This is how the '+esc(dl)+' skin looks. You are still on <strong>'+esc(cur)+'</strong>, and what you wear does not change.</p></div></div>';
+  }
+  var label = !r ? 'Ask to move to '+esc(dl) : r.status === 'pending' ? 'Request sent' : 'Approved, not applied yet';
+  h += '<div class="actions"><button type="button" class="btn primary" id="submitReq"'+(busy?' disabled':' data-act="submit"')+'>'+label+'</button>';
+  if (V === 'v2') h += '<button type="button" class="btn ghost" id="previewBtn" data-act="preview" aria-expanded="'+ui.preview+'">'+(ui.preview?'Hide '+esc(dl)+' look':'Preview '+esc(dl)+' look')+'</button>';
+  h += '</div>';
+  return h + '</section>';
+}
+
+// ---------- teacher ----------
+function ringSvg(){
+  var order = ['space','ballet','plants','past','ocean'], pts = {}, s = '';
+  order.forEach(function(k,i){ var a = -Math.PI/2 + i*2*Math.PI/5; pts[k] = [210+130*Math.cos(a), 150+110*Math.sin(a)]; });
+  s += '<svg class="ring" viewBox="0 0 420 300" role="img" aria-label="Class interest groups. Student A is in '+LABEL[S.interest]+'.">';
+  order.forEach(function(k,i){ var n = pts[order[(i+1)%5]], p = pts[k]; s += '<line x1="'+p[0]+'" y1="'+p[1]+'" x2="'+n[0]+'" y2="'+n[1]+'" stroke="rgba(255,255,255,.12)" stroke-width="2"/>'; });
+  order.forEach(function(k){ var p = pts[k], on = k === S.interest;
+    s += '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(on?26:18)+'" fill="'+(on?'#1d3a5c':'#161d33')+'" stroke="'+(on?'#58b6fa':'rgba(255,255,255,.18)')+'" stroke-width="2"/>';
+    s += '<text x="'+p[0]+'" y="'+(p[1]+(on?44:36))+'" fill="'+(on?'#f6f1ea':'#8892b0')+'" font-size="13" text-anchor="middle">'+esc(LABEL[k])+'</text>';
+    if (on) s += '<text x="'+p[0]+'" y="'+(p[1]+4)+'" fill="#f6f1ea" font-size="11" font-weight="700" text-anchor="middle">A</text>';
+  });
+  return s + '</svg>';
+}
+function teacher(){
+  var r = S.request, cur = LABEL[S.interest], h = '';
+  h += '<div class="idrow"><span class="name">Teacher</span><span class="muted">Class</span></div>';
+  h += '<div class="tgrid"><section class="panel" aria-labelledby="galH"><h2 id="galH">Galaxy Homepage</h2><p class="muted">Simplified stand-in: class interest groups. Not the 3D room or calendar.</p>'+ringSvg()+'</section>';
+  h += '<section class="panel" aria-labelledby="rosH"><h2 id="rosH">Class</h2><div class="roster"><div class="srow" id="rowA"><span class="name" style="font-size:16px">Student A</span><span class="tag">Prototype pseudonym</span><span class="sint">Interest: <span id="tInterest">'+esc(cur)+'</span></span>';
+  if (r && r.status === 'pending') h += '<button type="button" class="tbadge" id="teacherBadge" data-act="open" aria-haspopup="dialog" aria-label="Student A has an interest switch request. Open."><span class="adot"></span>Switch request</button>';
+  else if (r && r.status === 'scheduled') h += '<span class="shint" id="schedHint">Scheduled: '+esc(LABEL[r.to])+' later · still on '+esc(cur)+'</span>';
+  h += '</div></div><p class="toast" id="tToast" role="status">'+esc(ui.toast)+'</p></section></div>';
+  return h;
+}
+function modal(){
+  var r = S.request, cur = LABEL[S.interest], to = LABEL[r.to], h = '';
+  h += '<div class="mhead"><h2 id="mTitle">Interest switch request</h2><button type="button" class="btn ghost mx" id="mClose" data-act="close">Close</button></div>';
+  h += '<p><span class="name" style="font-size:16px">Student A</span> <span class="tag">Prototype pseudonym</span></p>';
+  if (V === 'v2') {
+    h += '<div class="sbs"><figure>'+scene(S.interest,180,120,'mc')+'<figcaption>Current: <strong style="color:var(--text)" id="mCur">'+esc(cur)+'</strong></figcaption></figure><figure>'+scene(r.to,180,120,'mr')+'<figcaption>Requested: <strong style="color:var(--text)" id="mReq">'+esc(to)+'</strong> (next to '+esc(cur)+')</figcaption></figure></div>';
+  } else {
+    h += '<div class="mfacts"><div class="row"><span class="k">Current interest</span><strong id="mCur">'+esc(cur)+'</strong></div><div class="row"><span class="k">Requested interest</span><strong id="mReq">'+esc(to)+'</strong> <span class="muted">(next to '+esc(cur)+')</span></div></div>';
+  }
+  h += '<div class="mact"><button type="button" class="btn deny" id="mDeny" data-act="deny">✕ Deny</button><button type="button" class="btn approve" id="mApprove" data-act="approve">✓ Approve</button></div>';
+  h += '<p class="mnote">One tap. No reason field in this prototype only (OQ-3). Approve schedules the change for later; it does not apply now.</p>';
+  return h;
+}
+
+// ---------- render ----------
+var lastFocus = null;
+function render(){
+  var st = S.view === 'student';
+  $('student').hidden = !st; $('teacher').hidden = st;
+  $('student').innerHTML = st ? student() : '';
+  $('teacher').innerHTML = st ? '' : teacher();
+  $('viewTitle').textContent = st ? 'Student view · Trophy Bag' : 'Teacher view · Galaxy Homepage';
+  $('viewStudent').setAttribute('aria-pressed', st); $('viewTeacher').setAttribute('aria-pressed', !st);
+  var open = ui.modal && S.request && S.request.status === 'pending' && !st;
+  $('scrim').hidden = !open;
+  $('modal').className = 'modal' + (V === 'v2' ? ' wide' : '');
+  $('modal').innerHTML = open ? modal() : '';
+  if (!open) ui.modal = false;
+}
+function focusId(id){ var e = $(id); if (e) e.focus({preventScroll:true}); }
+function act(a, el){
+  if (a === 'view') { S.view = el.getAttribute('data-view'); ui.modal = false; ui.toast = ''; save(); render(); protoMsg(''); return; }
+  if (a === 'banner') { var b = $('banner'), c = b.classList.toggle('collapsed'); el.setAttribute('aria-expanded', !c); el.textContent = c ? 'Expand' : 'Collapse'; return; }
+  if (a === 'reset') { localStorage.removeItem(KEY); S = seed(); ui = {preview:false, sel:null, choice:null, toast:'', modal:false}; save(); render(); protoMsg('Demo reset to seeded state.'); return; }
+  if (a === 'delay') {
+    if (S.request && S.request.status === 'scheduled') { var to = S.request.to; S.interest = to; S.request = null; S.last = 'applied'; ui.toast = ''; save(); render(); protoMsg('Delayed transition ran: Student A is now on ' + LABEL[to] + '.'); }
+    else protoMsg('Nothing scheduled. No change.');
+    return;
+  }
+  if (a === 'choose') { ui.choice = el.getAttribute('data-to'); render(); focusId('optAdj'); return; }
+  if (a === 'preview') { ui.preview = !ui.preview; render(); focusId('previewBtn'); return; }
+  if (a === 'submit') {
+    if (S.request) return; // one request at a time
+    var d = dest(); if (!d || d === NONADJ) return;
+    S.request = {status:'pending', to:d}; S.last = null; ui.choice = null; save(); render(); focusId('reqStatus'); return;
+  }
+  if (a === 'sel') { var id = el.getAttribute('data-id'); ui.sel = ui.sel === id ? null : id; render(); var t = document.querySelector('.tile[data-id="'+id+'"]'); if (t) t.focus({preventScroll:true}); return; }
+  if (a === 'open') { if (!S.request || S.request.status !== 'pending') return; lastFocus = 'teacherBadge'; ui.modal = true; render(); focusId('mClose'); return; }
+  if (a === 'close') { closeModal(); return; }
+  if (a === 'approve' || a === 'deny') {
+    if (!S.request || S.request.status !== 'pending') return;
+    var to2 = LABEL[S.request.to];
+    if (a === 'approve') { S.request.status = 'scheduled'; S.last = null; ui.toast = 'Approved: ' + to2 + ' is scheduled for later. Student A stays on ' + LABEL[S.interest] + ' for now.'; }
+    else { S.request = null; S.last = 'denied'; ui.toast = 'Denied. Student A stays on ' + LABEL[S.interest] + ' and can ask again.'; }
+    ui.modal = false; save(); render(); focusId('tToast'); return;
+  }
+}
+function closeModal(){ ui.modal = false; render(); if (lastFocus) focusId(lastFocus); }
+document.addEventListener('click', function(e){
+  var el = e.target.closest('[data-act]');
+  if (el && !el.disabled) { act(el.getAttribute('data-act'), el); return; }
+  if (e.target === $('scrim')) closeModal();
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') { if (ui.modal) { closeModal(); e.preventDefault(); } else if (V === 'v3' && ui.sel) { var id = ui.sel; ui.sel = null; render(); var t = document.querySelector('.tile[data-id="'+id+'"]'); if (t) t.focus({preventScroll:true}); } }
+  if (e.key === 'Tab' && ui.modal) { // keep focus inside the modal
+    var f = $('modal').querySelectorAll('button'); if (!f.length) return;
+    var first = f[0], last = f[f.length-1];
+    if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+    else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+  }
+});
+window.addEventListener('storage', function(e){ if (e.key === KEY) { S = load(); render(); } });
+save(); render();
+})();
+
+</script>
+</body>
+</html>
