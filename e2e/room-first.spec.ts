@@ -288,3 +288,90 @@ test("drags student to another cluster, persists across reload, and returns 409 
     }
   }
 });
+
+test("hides empty groups from Galaxy grid and reveals top-right drop popover while dragging", async ({
+  page,
+  request,
+}) => {
+  const initialRes = await request.get("/api/room");
+  expect(initialRes.ok()).toBe(true);
+  const initialRoom = (await initialRes.json()) as {
+    students: { id: string; firstName: string; packId: string; version: number }[];
+  };
+  const cosmo = initialRoom.students.find((s) => s.firstName === "Cosmo");
+  expect(cosmo).toBeDefined();
+  const cosmoId = cosmo!.id;
+  const originalPack = cosmo!.packId;
+  expect(initialRoom.students.some((s) => s.packId === "pack_fashion")).toBe(false);
+
+  try {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+
+    // Empty group is hidden in the main grid, and popover is hidden until drag starts
+    await expect(page.locator('[data-galaxy-cell="pack_fashion"]')).toHaveCount(0);
+    await expect(page.getByTestId("empty-packs-popover")).toHaveCount(0);
+
+    const cosmoNode = page.locator(`[data-student-id="${cosmoId}"]`);
+    const cosmoBox = await cosmoNode.boundingBox();
+    expect(cosmoBox).not.toBeNull();
+
+    // Activate PointerSensor (distance: 6)
+    await page.mouse.move(
+      cosmoBox!.x + cosmoBox!.width / 2,
+      cosmoBox!.y + cosmoBox!.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      cosmoBox!.x + cosmoBox!.width / 2 + 16,
+      cosmoBox!.y + cosmoBox!.height / 2,
+      { steps: 4 },
+    );
+
+    const emptyPopover = page.getByTestId("empty-packs-popover");
+    await expect(emptyPopover).toBeVisible();
+    const popBox = await emptyPopover.boundingBox();
+    expect(popBox).not.toBeNull();
+    expect(popBox!.x).toBeGreaterThan(1280 / 2);
+    expect(popBox!.y).toBeLessThan(800 / 2);
+
+    const fashionDrop = page.locator('[data-empty-pack-drop="pack_fashion"]');
+    await expect(fashionDrop).toBeVisible();
+    const fashionBox = await fashionDrop.boundingBox();
+    expect(fashionBox).not.toBeNull();
+
+    const movePromise = page.waitForResponse(
+      (res) => res.url().includes("/api/room/move") && res.request().method() === "POST",
+    );
+    await page.mouse.move(
+      fashionBox!.x + fashionBox!.width / 2,
+      fashionBox!.y + fashionBox!.height / 2,
+      { steps: 12 },
+    );
+    await expect(fashionDrop).toHaveAttribute("data-drag-over", "true");
+    await page.mouse.up();
+    expect((await movePromise).status()).toBe(200);
+
+    await expect(emptyPopover).toHaveCount(0);
+    await expect(
+      page.locator(`[data-galaxy-cell="pack_fashion"] [data-student-id="${cosmoId}"]`),
+    ).toBeVisible();
+  } finally {
+    const curRes = await request.get("/api/room");
+    if (curRes.ok()) {
+      const curRoom = (await curRes.json()) as {
+        students: { id: string; packId: string; version: number }[];
+      };
+      const curCosmo = curRoom.students.find((s) => s.id === cosmoId);
+      if (curCosmo && curCosmo.packId !== originalPack) {
+        await request.post("/api/room/move", {
+          data: {
+            studentId: cosmoId,
+            toPackId: originalPack,
+            expectedVersion: curCosmo.version,
+          },
+        });
+      }
+    }
+  }
+});

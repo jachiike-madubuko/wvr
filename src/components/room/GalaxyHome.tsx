@@ -4,11 +4,15 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
+  MeasuringStrategy,
   PointerSensor,
+  pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -265,6 +269,41 @@ function PackCluster({
   );
 }
 
+function EmptyPackDropItem({ pack }: { pack: RoomPack }) {
+  const { setNodeRef, isOver } = useDroppable({ id: pack.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      data-empty-pack-drop={pack.id}
+      data-drag-over={isOver ? "true" : undefined}
+      className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs transition-colors ${
+        isOver
+          ? "border-2 border-dashed border-[#4ade80] bg-[#4ade80]/15 text-white"
+          : "border border-white/10 bg-white/[0.04] text-[#f6f1ea]"
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        <span
+          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: pack.color }}
+        />
+        <span
+          className="font-bold"
+          style={{ fontFamily: "var(--font-serif-display)" }}
+        >
+          {pack.label}
+        </span>
+      </span>
+      {isOver && (
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[#4ade80]">
+          Drop
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function GalaxyHome({
   packs,
   students,
@@ -377,6 +416,35 @@ export function GalaxyHome({
   const activePackColor =
     packs.find((p) => p.id === activeStudent?.packId)?.color ?? "#58b6fa";
 
+  const membersByPack = new Map<string, StudentWithEquipped[]>();
+  for (const stu of students) {
+    const list = membersByPack.get(stu.packId) ?? [];
+    list.push(stu);
+    membersByPack.set(stu.packId, list);
+  }
+  const occupiedPacks = packs.filter(
+    (p) => (membersByPack.get(p.id)?.length ?? 0) > 0,
+  );
+  const emptyPacks = packs.filter(
+    (p) => (membersByPack.get(p.id)?.length ?? 0) === 0,
+  );
+  const emptyPackIds = new Set(emptyPacks.map((p) => p.id));
+
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointerHits = pointerWithin(args);
+    const popoverHit = pointerHits.find((c) => emptyPackIds.has(String(c.id)));
+    if (popoverHit) return [popoverHit];
+    if (pointerHits.length > 0) return pointerHits;
+    return rectIntersection(args);
+  };
+
+  const gridColsClass =
+    occupiedPacks.length <= 1
+      ? "grid-cols-1"
+      : occupiedPacks.length === 2
+        ? "grid-cols-2"
+        : "grid-cols-2 lg:grid-cols-3";
+
   const handleDragStart = (event: DragStartEvent) => {
     clearTimers();
     setPopover(null);
@@ -430,17 +498,19 @@ export function GalaxyHome({
 
       <DndContext
         sensors={sensors}
+        collisionDetection={collisionDetection}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="grid min-h-0 flex-1 grid-cols-2 auto-rows-fr gap-3 sm:gap-4 lg:grid-cols-3">
-          {packs.map((pack, packIndex) => (
+        <div className={`grid min-h-0 flex-1 auto-rows-fr gap-3 sm:gap-4 ${gridColsClass}`}>
+          {occupiedPacks.map((pack, packIndex) => (
             <PackCluster
               key={pack.id}
               pack={pack}
               packIndex={packIndex}
-              members={students.filter((s) => s.packId === pack.id)}
+              members={membersByPack.get(pack.id) ?? []}
               activeStudent={activeStudent}
               isPaused={
                 popover?.student.packId === pack.id ||
@@ -463,6 +533,23 @@ export function GalaxyHome({
             />
           ))}
         </div>
+
+        {activeStudent && emptyPacks.length > 0 && (
+          <aside
+            data-testid="empty-packs-popover"
+            aria-label="Unoccupied interest groups"
+            className="absolute right-0 top-0 z-40 w-56 rounded-2xl border border-[#2a344d] bg-[#111625]/95 p-3 shadow-2xl backdrop-blur-md"
+          >
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8892b0]">
+              Unoccupied groups
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {emptyPacks.map((pack) => (
+                <EmptyPackDropItem key={pack.id} pack={pack} />
+              ))}
+            </div>
+          </aside>
+        )}
 
         {mounted ? createPortal(dragOverlayContent, document.body) : null}
       </DndContext>
