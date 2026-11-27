@@ -35,6 +35,11 @@ import {
   type MosaicBlock,
   type RawPathPayload,
 } from "@/lib/student-path/deck";
+import {
+  MOSAIC_ROW_UNIT,
+  mosaicRowSpan,
+  mosaicTileHeight,
+} from "@/lib/student-path/mosaic-layout";
 import { BreakTimer } from "./BreakTimer";
 import { CollectibleInventory } from "./CollectibleInventory";
 import { DrawPad } from "./DrawPad";
@@ -727,7 +732,8 @@ export function BlockFlip({
         ) : (
           <div
             data-testid="mosaic-grid"
-            className="grid grid-cols-2 items-start gap-4"
+            className="grid grid-cols-2 gap-x-4 gap-y-0 [grid-auto-flow:dense]"
+            style={{ gridAutoRows: `${MOSAIC_ROW_UNIT}px` }}
           >
             {deck.map((block, index) => {
               const unlocked = isBlockUnlocked(index, completedIds, deck);
@@ -735,6 +741,7 @@ export function BlockFlip({
               const hidden = flip?.id === block.id;
               const face = FACE[block.role];
               const wide = block.span === 2;
+              const tileHeight = mosaicTileHeight(block.id, student.id);
 
               return (
                 <button
@@ -744,12 +751,15 @@ export function BlockFlip({
                   data-block-id={block.id}
                   data-role={block.role}
                   data-span={wide ? "2" : undefined}
+                  data-tile-height={tileHeight}
                   data-locked={unlocked ? "false" : "true"}
                   data-done={done ? "true" : "false"}
                   onClick={(e) => openTile(block, unlocked, done, e)}
                   style={{
                     gridColumn: wide ? "1 / -1" : undefined,
-                    height: block.h ?? 168,
+                    gridRowEnd: `span ${mosaicRowSpan(tileHeight)}`,
+                    alignSelf: "start",
+                    height: tileHeight,
                     borderRadius: "var(--radius-pin)",
                     background: face.bg,
                     color: face.ink,

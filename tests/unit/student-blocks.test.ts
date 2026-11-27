@@ -20,6 +20,14 @@ import {
   nextAttemptState,
   resolveInitialStudent,
 } from "@/lib/student-path/deck";
+import {
+  MOSAIC_GAP,
+  MOSAIC_MAX_HEIGHT,
+  MOSAIC_MIN_HEIGHT,
+  MOSAIC_ROW_UNIT,
+  mosaicRowSpan,
+  mosaicTileHeight,
+} from "@/lib/student-path/mosaic-layout";
 
 test("block library defines 4 roles and 21 sub-types across 6 types", () => {
   expect(Object.keys(FACE)).toEqual(["start", "try", "check", "next"]);
@@ -221,4 +229,39 @@ test("StudentSwitchModal renders accessible dialog with all roster names and mar
     }),
   );
   expect(closedHtml).toBe("");
+});
+
+test("mosaicTileHeight and mosaicRowSpan produce deterministic varied row-aligned heights across Space blocks and seeds", () => {
+  expect(MOSAIC_ROW_UNIT).toBe(4);
+  expect(MOSAIC_GAP).toBe(16);
+  expect(MOSAIC_MIN_HEIGHT).toBe(136);
+  expect(MOSAIC_MAX_HEIGHT).toBe(236);
+
+  const deck = buildMosaicDeck({ packId: "pack_space" });
+  expect(deck).toHaveLength(11);
+
+  const seeds: Array<string | undefined> = [
+    undefined,
+    "maya",
+    "cosmo",
+    "leo",
+    "11111111-1111-4111-8111-111111111111",
+    "22222222-2222-4222-8222-222222222222",
+    "33333333-3333-4333-8333-333333333333",
+  ];
+
+  for (const seed of seeds) {
+    const heights = deck.map((block) => mosaicTileHeight(block.id, seed));
+    const repeatHeights = deck.map((block) => mosaicTileHeight(block.id, seed));
+    expect(heights).toEqual(repeatHeights);
+
+    for (const h of heights) {
+      expect(h).toBeGreaterThanOrEqual(MOSAIC_MIN_HEIGHT);
+      expect(h).toBeLessThanOrEqual(MOSAIC_MAX_HEIGHT);
+      expect(h % MOSAIC_ROW_UNIT).toBe(0);
+      expect(mosaicRowSpan(h)).toBe((h + 16) / 4);
+    }
+
+    expect(new Set(heights).size).toBeGreaterThanOrEqual(4);
+  }
 });

@@ -64,6 +64,60 @@ test("renders 2-column Space mosaic with 3D flip activation, lazy hook iframe, a
   expect(elaBox!.y).toBeGreaterThan(hookBox!.y);
   expect(artBox!.x).toBeGreaterThan(elaBox!.x);
 
+  // Verify masonry tile height variety and gap-free 2-column vertical packing
+  const nonHookBoxes: Array<{
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> = [];
+  const tileCount = await tiles.count();
+  for (let i = 0; i < tileCount; i++) {
+    const tile = tiles.nth(i);
+    const id = await tile.getAttribute("data-block-id");
+    const span = await tile.getAttribute("data-span");
+    const declaredHeight = Number(await tile.getAttribute("data-tile-height"));
+    const tileBox = await tile.boundingBox();
+    expect(tileBox).not.toBeNull();
+    expect(declaredHeight).toBeGreaterThanOrEqual(136);
+    expect(declaredHeight).toBeLessThanOrEqual(236);
+    expect(declaredHeight % 4).toBe(0);
+    if (span === "2") continue;
+    expect(tileBox!.height).toBeGreaterThanOrEqual(136);
+    expect(tileBox!.height).toBeLessThanOrEqual(236);
+    expect(Math.abs(tileBox!.height - declaredHeight)).toBeLessThanOrEqual(2);
+    nonHookBoxes.push({ id: id ?? String(i), ...tileBox! });
+  }
+
+  expect(nonHookBoxes).toHaveLength(10);
+  const distinctHeights = new Set(
+    nonHookBoxes.map((b) => Math.round(b.height)),
+  );
+  expect(distinctHeights.size).toBeGreaterThanOrEqual(3);
+
+  const minX = Math.min(...nonHookBoxes.map((b) => b.x));
+  const maxX = Math.max(...nonHookBoxes.map((b) => b.x));
+  expect(maxX - minX).toBeGreaterThan(100);
+  const midX = (minX + maxX) / 2;
+  const leftCol = nonHookBoxes
+    .filter((b) => b.x < midX)
+    .sort((a, b) => a.y - b.y);
+  const rightCol = nonHookBoxes
+    .filter((b) => b.x >= midX)
+    .sort((a, b) => a.y - b.y);
+  expect(leftCol.length).toBeGreaterThanOrEqual(2);
+  expect(rightCol.length).toBeGreaterThanOrEqual(2);
+
+  for (const col of [leftCol, rightCol]) {
+    for (let i = 1; i < col.length; i++) {
+      const prev = col[i - 1]!;
+      const curr = col[i]!;
+      const gap = curr.y - (prev.y + prev.height);
+      expect(Math.abs(gap - 16)).toBeLessThanOrEqual(2);
+    }
+  }
+
   // Clicking a locked continuation tile shakes without opening flip modal
   await lockedContTile.click({ force: true });
   await expect(lockedContTile).toHaveClass(/wv-pin-shake/);
