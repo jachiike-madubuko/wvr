@@ -5,10 +5,25 @@
 //   horizontal overflow, network calls, guard-list names, and the checklist loop
 //   (request, pending, reload, badge, modal, Escape, approve, scheduled, delay, deny, re-request, reset,
 //   v2 destination preview, v3 temporary item preview, v4 button-skin preview + one-equipped-per-slot bag).
+// Served from a throwaway 127.0.0.1 server; any request other than the page itself counts as a network call.
 // Usage: node prototypes/WVR-231/check.cjs [v1 v2 v3]   (needs the `playwright` package; NODE_PATH is fine)
 // Exit code 0 = all checks pass. Do not push on a non-zero exit.
 const path = require('path');
 const { chromium } = require('playwright');
+const http = require('http');
+const fs = require('fs');
+// Serve this folder on 127.0.0.1. Chrome's file:// localStorage sometimes comes back empty after a reload
+// (about 1 in 10 runs), which made the reload checks flaky. Over http it is stable. Nothing leaves the machine.
+function serve() {
+  return new Promise(res => {
+    const srv = http.createServer((req, rsp) => {
+      const f = path.join(DIR, decodeURIComponent(req.url.split('?')[0]));
+      if (!f.startsWith(DIR) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+      rsp.writeHead(200, { 'content-type': f.endsWith('.html') ? 'text/html; charset=utf-8' : 'application/octet-stream' });
+      fs.createReadStream(f).pipe(rsp);
+    }).listen(0, '127.0.0.1', () => res(srv));
+  });
+}
 const DIR = __dirname;
 const VARS = process.argv.slice(2).length ? process.argv.slice(2) : ['v1', 'v2', 'v3', 'v4'];
 const WIDTHS = [1024, 1280, 1440];
@@ -18,6 +33,7 @@ const BANNED = [/switch now/i, /credit/i, /force/i, /phone/i, /iphone/i, /Named 
 const BANNER = 'Proposed defaults, not decided: see Open questions in stories.md. This file is a prototype, not the app.';
 const results = [];
 let fails = 0;
+let CUR = '';
 function rec(v, id, ok, msg) { results.push({ v, id, ok, msg }); if (!ok) fails++; }
 
 async function layout(page, v, w, label) {
@@ -78,16 +94,19 @@ async function scrollJump(page, v, w, sel, label) {
 }
 
 (async () => {
+  const srv = await serve();
+  const BASE = `http://127.0.0.1:${srv.address().port}/`;
   let browser;
   try { browser = await chromium.launch(); } catch (e) { browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome' }); }
   for (const v of VARS) {
-    const url = 'file://' + path.join(DIR, v, 'index.html');
+    const url = BASE + v + '/index.html';
     const K = `wvr231:${v}:state`;
     for (const w of WIDTHS) {
+      CUR = `${v} @ ${w}px`;
       const ctx = await browser.newContext({ viewport: { width: w, height: 720 } });
       const page = await ctx.newPage();
       const net = [], errs = [];
-      page.on('request', r => { const u = r.url(); if (!u.startsWith('file:') && !u.startsWith('data:')) net.push(u); });
+      page.on('request', r => { const u = r.url(); if (!u.startsWith(url) && !u.startsWith('data:')) net.push(u); });
       page.on('pageerror', e => errs.push(e.message));
       await page.goto(url);
       await page.click('#resetBtn');
@@ -207,11 +226,12 @@ async function scrollJump(page, v, w, sel, label) {
         rec(v, 'T-21', await page.isDisabled('#submitReq'), 'second submit disabled while pending');
         await page.reload();
         s = await ST();
-        rec(v, 'T-22', s.request.status === 'pending' && s.interest === 'space' && await page.isDisabled('#submitReq'), 'reload keeps pending + Space');
+        rec(v, 'T-22', !!s && !!s.request && s.request.status === 'pending' && s.interest === 'space' && await page.isDisabled('#submitReq'), 'reload keeps pending + Space');
         rec(v, 'T-13a', (await page.$eval('svg.av', e => e.outerHTML)) === avSeed, 'avatar unchanged after request');
         // D. teacher
         await page.click('#viewTeacher');
-        rec(v, 'T-06', (await ST()).request.status === 'pending' && await page.isVisible('#teacher') && !(await page.isVisible('#student')), 'view switch keeps state');
+        const s6 = await ST();
+        rec(v, 'T-06', !!s6 && !!s6.request && s6.request.status === 'pending' && await page.isVisible('#teacher') && !(await page.isVisible('#student')), 'view switch keeps state: ' + JSON.stringify(s6));
         rec(v, 'T-23', /Galaxy Homepage/.test(await body()) && await page.isVisible('svg.ring'), 'simplified Galaxy Homepage');
         rec(v, 'T-24', await page.isVisible('#rowA #teacherBadge'), 'badge on Student A row');
         await page.click('#teacherBadge');
@@ -286,6 +306,7 @@ async function scrollJump(page, v, w, sel, label) {
     }
   }
   await browser.close();
+  srv.close();
   for (const v of VARS) {
     const rs = results.filter(r => r.v === v), f = rs.filter(r => !r.ok);
     console.log(`\n== ${v}: ${rs.length - f.length}/${rs.length} pass`);
@@ -293,4 +314,4 @@ async function scrollJump(page, v, w, sel, label) {
   }
   console.log(fails ? `\nFAILED: ${fails} check(s). Do not push.` : '\nALL CHECKS PASS');
   process.exit(fails ? 1 : 0);
-})().catch(e => { console.error(e); process.exit(2); });
+})().catch(e => { console.error('crashed during ' + CUR + ':', e); process.exit(2); });
