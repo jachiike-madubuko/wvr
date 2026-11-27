@@ -29,19 +29,29 @@ export function StudentSwitchModal({
 }: StudentSwitchModalProps) {
   const titleId = useId();
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (open) {
+      closeBtnRef.current?.focus();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    closeBtnRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
