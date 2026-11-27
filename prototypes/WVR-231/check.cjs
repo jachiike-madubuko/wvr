@@ -4,13 +4,13 @@
 //   click-target sizes, gaps between targets, text wraps in controls, scroll jumps,
 //   horizontal overflow, network calls, guard-list names, and the checklist loop
 //   (request, pending, reload, badge, modal, Escape, approve, scheduled, delay, deny, re-request, reset,
-//   v2 destination preview, v3 temporary item preview).
+//   v2 destination preview, v3 temporary item preview, v4 button-skin preview + one-equipped-per-slot bag).
 // Usage: node prototypes/WVR-231/check.cjs [v1 v2 v3]   (needs the `playwright` package; NODE_PATH is fine)
 // Exit code 0 = all checks pass. Do not push on a non-zero exit.
 const path = require('path');
 const { chromium } = require('playwright');
 const DIR = __dirname;
-const VARS = process.argv.slice(2).length ? process.argv.slice(2) : ['v1', 'v2', 'v3'];
+const VARS = process.argv.slice(2).length ? process.argv.slice(2) : ['v1', 'v2', 'v3', 'v4'];
 const WIDTHS = [1024, 1280, 1440];
 const MIN_TARGET = 36, MIN_GAP = 8;
 const GUARD = ['Tobin', 'Rivera', 'Room 12', 'Maya', 'Jordan', 'Avery', 'Riley', 'Casey', 'Quinn', 'Morgan', 'Jamie', 'Taylor', 'Drew', 'Skyler', 'Parker', 'Cameron', 'Rowan', 'Nico', 'Andre', 'Lila'];
@@ -134,15 +134,29 @@ async function scrollJump(page, v, w, sel, label) {
         const ban = BANNED.filter(re => re.test(all));
         rec(v, 'T-42', ban.length === 0, 'banned copy: ' + (ban.map(String).join(',') || 'none'));
         // B. bag + avatar
-        const tiles = await page.$$eval('[data-item]', es => es.map(e => ({ id: e.dataset.item, name: e.querySelector('.iname').textContent, memo: e.querySelector('.memo').textContent, locked: e.classList.contains('locked'), eq: !!e.querySelector('.eqtag') })));
+        const tiles = await page.$$eval('[data-item]', es => es.map(e => ({ id: e.dataset.item, name: e.querySelector('.iname').firstChild.textContent.trim(), memo: e.querySelector('.memo').textContent, locked: e.classList.contains('locked'), eq: !!e.querySelector('.eqtag') })));
         const CAT = ['Number Helmet', 'Word Gloves', 'Planet Badge', 'Social Cape', 'Art Brush', 'Streak Boots', 'Comeback Visor', 'Traveler Star'];
-        rec(v, 'T-09/T-11', tiles.length === 8 && tiles.every(t => CAT.includes(t.name)), 'catalog names: ' + tiles.map(t => t.name).join(', '));
+        // v4 holds several owned copies per slot, so it needs every catalog name present and no other names (not exactly 8 tiles)
+        const catOk = v === 'v4' ? CAT.every(n => tiles.some(t => t.name === n)) : tiles.length === 8;
+        rec(v, 'T-09/T-11', catOk && tiles.every(t => CAT.includes(t.name)), 'catalog names: ' + tiles.map(t => t.name).join(', '));
+        if (v === 'v4') {
+          const M4 = { helmet: 'Mastered 10s addition', visor: 'Kept going after 3 misses', badge: 'Matched the planets to their names', boots: 'Answered 3 in a row on the first try', cape1: 'Put spaceflight events in order', cape2: 'Matched landmarks to their countries', cape3: 'Put a day of school in time order' };
+          const un4 = tiles.filter(t => !t.locked);
+          rec(v, 'T-10/T-14', un4.length === 7 && un4.every(t => M4[t.id] === t.memo), 'unlocked memos: ' + un4.map(t => t.id + '=' + t.memo).join(' | '));
+          const slots = await page.$$eval('.slot', ss => ss.map(s => ({ slot: s.dataset.slot, owned: s.querySelectorAll('.tile:not(.locked)').length, eq: s.querySelectorAll('.tile .eqtag').length, own: s.querySelectorAll('.tile .owntag').length })));
+          const capes = slots.find(x => x.slot === 'back');
+          rec(v, 'v4-slots', slots.every(x => x.eq <= 1 && x.eq + x.own === x.owned) && capes.owned >= 2 && capes.eq === 1 && (await txt('#slotRule')).includes('Only one per slot is equipped at a time'), 'one Equipped per slot, others Owned; capes ' + JSON.stringify(capes));
+          const eq4 = tiles.filter(t => t.eq).map(t => t.id).join(',');
+          const w4 = await txt('#wearing');
+          rec(v, 'T-12', eq4 === 'helmet,cape1,badge' && ['Number Helmet', 'Social Cape (Red)', 'Planet Badge'].every(n => w4.includes(n)), `grid equipped ${eq4}; avatar "${w4.trim()}"`);
+          rec(v, 'v4-no-equip-controls', (await page.$$('.tile button, button.tile, [data-act=sel], [data-act=equip]')).length === 0, 'bag tiles are not controls (no try-on, no equip)');
+        }
         const MEMO = { 'Number Helmet': 'Mastered 10s addition', 'Comeback Visor': 'Kept going after 3 misses', 'Planet Badge': 'Matched the planets to their names', 'Streak Boots': 'Answered 3 in a row on the first try' };
         const un = tiles.filter(t => !t.locked);
-        rec(v, 'T-10/T-14', un.length === 4 && un.every(t => MEMO[t.name] === t.memo), 'unlocked memos: ' + un.map(t => t.name + '=' + t.memo).join(' | '));
+        if (v !== 'v4') rec(v, 'T-10/T-14', un.length === 4 && un.every(t => MEMO[t.name] === t.memo), 'unlocked memos: ' + un.map(t => t.name + '=' + t.memo).join(' | '));
         const eqNames = tiles.filter(t => t.eq).map(t => t.name).join(',');
         const wearing = await txt('#wearing');
-        rec(v, 'T-12', eqNames === 'Number Helmet,Planet Badge' && wearing.includes('Number Helmet') && wearing.includes('Planet Badge'), `grid equipped ${eqNames}; avatar "${wearing.trim()}"`);
+        if (v !== 'v4') rec(v, 'T-12', eqNames === 'Number Helmet,Planet Badge' && wearing.includes('Number Helmet') && wearing.includes('Planet Badge'), `grid equipped ${eqNames}; avatar "${wearing.trim()}"`);
         const avSeed = await page.$eval('svg.av', e => e.outerHTML);
         // C. request
         rec(v, 'T-15', (await txt('#curInterest')) === 'Space' && (await txt('#optAdj')).includes('Ocean') && (await txt('#submitReq')).includes('Ocean'), 'current Space, destination Ocean visible');
@@ -155,6 +169,22 @@ async function scrollJump(page, v, w, sel, label) {
           const avPv = await page.$eval('svg.av', e => e.outerHTML);
           rec(v, 'T-40', /not applied/i.test(pv) && /still on/i.test(pv) && /does not change/i.test(pv) && avPv === avSeed && (await txt('#skinLbl')) === 'Space' && (await txt('#today')).includes('Space') && (await page.isVisible('#delayNote')), 'preview labeled not applied; avatar, skin, today unchanged; delay note shown');
           await page.click('#previewBtn');
+        }
+        if (v === 'v4') {
+          // T-40 (v4 form): destination skin is the request button background; nothing else changes
+          const sb = await page.$eval('#submitReq', e => { const sw = e.querySelector('svg.swatch'); const l = e.querySelector('.skinlbl'); return { skin: e.dataset.skin, sw: !!sw && sw.innerHTML.includes('#0e4d6b'), fg: getComputedStyle(l).color, bg: getComputedStyle(l).backgroundColor }; });
+          const parse = c => c.match(/[\d.]+/g).map(Number);
+          const lum = ([r, g, b]) => { const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+          const [br, bg, bb, ba = 1] = parse(sb.bg), worst = [95, 211, 230]; // lightest colour in the Ocean skin
+          const comp = [br * ba + worst[0] * (1 - ba), bg * ba + worst[1] * (1 - ba), bb * ba + worst[2] * (1 - ba)];
+          const L1 = lum(parse(sb.fg)), L2 = lum(comp), cr = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+          rec(v, 'T-40', sb.skin === 'ocean' && sb.sw && cr >= 4.5 && !(await page.$('#destPreview')) && !(await page.$('#previewBtn')) && (await page.$eval('svg.av', e => e.outerHTML)) === avSeed && (await txt('#skinLbl')) === 'Space' && (await txt('#today')).includes('Space') && /stay on Space/.test(await txt('#delayNote')), `button skin ${sb.skin}; label contrast ${cr.toFixed(1)}:1 (worst case); avatar/skin/today unchanged; no separate preview`);
+          const fold = await page.evaluate(() => { const b = document.getElementById('submitReq').getBoundingClientRect(); return b.bottom + scrollY; });
+          rec(v, 'v4-above-fold', fold <= 800, `request button bottom ${Math.round(fold)}px (fold 800 at 1280x800)`);
+          // polish: banner collapse visibly changes it
+          const bw = async () => page.$eval('#bannerText', e => Math.round(e.querySelector('.b1').getBoundingClientRect().width + (e.querySelector('.b2').getBoundingClientRect().width)));
+          const w0 = await bw(); await page.click('#bannerTog'); const w1 = await bw(); const t1 = (await txt('#bannerText')).trim(); await page.click('#bannerTog');
+          rec(v, 'v4-banner-visible', w1 < w0 - 50 && t1 === BANNER, `visible banner text width ${w0} -> ${w1} when collapsed; full text kept in DOM`);
         }
         if (v === 'v3') {
           await page.click('.tile[data-id="boots"]');
@@ -191,7 +221,7 @@ async function scrollJump(page, v, w, sel, label) {
         const af = await page.evaluate(() => document.activeElement && document.activeElement.id);
         const cA = await page.$eval('#mApprove', e => getComputedStyle(e).color), cD = await page.$eval('#mDeny', e => getComputedStyle(e).color);
         rec(v, 'T-28/T-30', inputs === 0 && af === 'mClose' && cA !== cD, `no reason field; initial focus ${af}; approve ${cA} vs deny ${cD}`);
-        if (v === 'v2') rec(v, 'v2-sbs', await page.isVisible('.sbs'), 'modal side-by-side current vs requested');
+        if (v === 'v2' || v === 'v4') rec(v, 'v2-sbs', await page.isVisible('.sbs'), 'modal side-by-side current vs requested');
         await page.keyboard.press('Escape');
         rec(v, 'T-31', !(await page.isVisible('#modal')) && (await ST()).request.status === 'pending' && await page.isVisible('#teacherBadge'), 'Escape keeps pending + badge');
         await page.click('#teacherBadge'); await page.click('#mClose');
@@ -203,6 +233,14 @@ async function scrollJump(page, v, w, sel, label) {
         rec(v, 'T-34', !(await page.isVisible('#teacherBadge')) && /later/.test(await txt('#schedHint')) && (await txt('#tInterest')) === 'Space', 'badge gone; scheduled hint; teacher still shows Space');
         await page.click('#viewStudent');
         rec(v, 'T-33', /does not apply yet/i.test(await txt('#reqStatus')) && (await txt('#curInterest')) === 'Space' && (await txt('#today')).includes('Space') && (await txt('#skinLbl')) === 'Space', 'student: not applied yet, still Space');
+        if (v === 'v4') {
+          const pill = await page.$eval('#submitReq', e => ({ tag: e.tagName, bg: getComputedStyle(e).backgroundColor, cur: getComputedStyle(e).cursor, dis: String(e.disabled), skin: !!e.querySelector('svg'), border: getComputedStyle(e).borderTopStyle }));
+          const opts = await page.$$('#optAdj, #optNon');
+          rec(v, 'v4-scheduled-not-pressable', /rgba\(0, 0, 0, 0\)|transparent/.test(pill.bg) && pill.cur === 'default' && pill.dis === 'true' && !pill.skin && pill.border === 'dashed' && opts.length === 0, `"Approved, not applied yet": disabled ${pill.dis}, no fill (${pill.bg}), dashed border, cursor ${pill.cur}, no skin; options hidden`);
+          const before = await page.$eval('#student', e => e.innerHTML);
+          await page.click('#viewTeacher'); await page.click('#viewStudent');
+          rec(v, 'v4-no-preview-persist', (await page.$eval('#student', e => e.innerHTML)) === before && !(await page.$('.sel, #selMemo, #destPreview')), 'no preview state survives a view switch');
+        }
         await page.reload();
         s = await ST();
         rec(v, 'T-35', s.request.status === 'scheduled' && s.interest === 'space' && (await txt('#curInterest')) === 'Space', 'reload keeps scheduled + Space');
