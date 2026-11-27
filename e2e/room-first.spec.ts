@@ -103,7 +103,25 @@ test("enforces strict 500ms hover delay before showing student popover", async (
   await page.waitForTimeout(450);
   await expect(popover).toHaveCount(0);
 
-  // Hover >= 500ms: popover appears offset beside node without overlapping it
+  // Narrow viewport (390px): popover still never overlaps the student node
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mayaNode.hover({ force: true });
+  await page.waitForTimeout(600);
+  await expect(popover).toBeVisible();
+  const narrowNode = await mayaNode.boundingBox();
+  const narrowPop = await popover.boundingBox();
+  expect(narrowNode && narrowPop).toBeTruthy();
+  const overlapsNarrow = !(
+    narrowPop!.x + narrowPop!.width <= narrowNode!.x ||
+    narrowPop!.x >= narrowNode!.x + narrowNode!.width ||
+    narrowPop!.y + narrowPop!.height <= narrowNode!.y ||
+    narrowPop!.y >= narrowNode!.y + narrowNode!.height
+  );
+  expect(overlapsNarrow).toBe(false);
+
+  // Hover >= 500ms on desktop (1280px): popover appears offset beside node without overlapping it
+  await page.mouse.move(10, 10);
+  await page.waitForTimeout(200);
   await page.setViewportSize({ width: 1280, height: 800 });
   await mayaNode.hover({ force: true });
   await page.waitForTimeout(600);
@@ -121,31 +139,27 @@ test("enforces strict 500ms hover delay before showing student popover", async (
     expect(popBox!.x + popBox!.width).toBeLessThanOrEqual(nodeBox!.x);
   }
 
-  // Moving pointer into popover keeps it open and View profile stays clickable
+  // Moving pointer into popover keeps it open and both nav links stay clickable
   const profileLink = popover.locator(`a[href="/students/${mayaId}"]`);
+  const blocksLink = popover.getByTestId("popover-view-blocks");
   await expect(profileLink).toBeVisible();
+  await expect(blocksLink).toBeVisible();
+  await expect(blocksLink).toHaveAttribute(
+    "href",
+    `/s/demo-space-lesson?student=${mayaId}`,
+  );
   await page.mouse.move(popBox!.x + popBox!.width / 2, popBox!.y + popBox!.height / 2);
   await page.waitForTimeout(200);
   await expect(popover).toBeVisible();
   await expect(profileLink).toBeVisible();
+  await expect(blocksLink).toBeVisible();
 
-  // Narrow viewport (390px): popover still never overlaps the student node
-  await page.mouse.move(10, 10);
-  await page.waitForTimeout(200);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await mayaNode.hover({ force: true });
-  await page.waitForTimeout(600);
-  await expect(popover).toBeVisible();
-  const narrowNode = await mayaNode.boundingBox();
-  const narrowPop = await popover.boundingBox();
-  expect(narrowNode && narrowPop).toBeTruthy();
-  const overlapsNarrow = !(
-    narrowPop!.x + narrowPop!.width <= narrowNode!.x ||
-    narrowPop!.x >= narrowNode!.x + narrowNode!.width ||
-    narrowPop!.y + narrowPop!.height <= narrowNode!.y ||
-    narrowPop!.y >= narrowNode!.y + narrowNode!.height
-  );
-  expect(overlapsNarrow).toBe(false);
+  // Clicking View current blocks lands directly on Maya's blocks view (skips roster-picker)
+  await blocksLink.click();
+  await expect(page).toHaveURL(`/s/demo-space-lesson?student=${mayaId}`);
+  await expect(page.getByTestId("roster-picker")).toHaveCount(0);
+  await expect(page.getByTestId("mosaic-grid")).toBeVisible();
+  await expect(page.locator("header")).toContainText("Maya");
 });
 
 test("clicking or pressing Enter on a Galaxy group title opens a group-level pacing breakdown and dismisses cleanly", async ({

@@ -35,7 +35,7 @@ export const CLOSE_DELAY_MS = 100;
 // Must match the wv-revolve duration in globals.css.
 const REVOLVE_MS = 48_000;
 const POPOVER_W = 224; // matches w-56
-const POPOVER_H_ESTIMATE = 150;
+const POPOVER_H_ESTIMATE = 196;
 
 type StudentWithEquipped = RoomStudent & { equipped?: EquippedLoadout };
 
@@ -486,12 +486,23 @@ export function GalaxyHome({
           <div className="my-2 text-xs text-slate-300">
             {popover.student.currentLessonTitle ?? "No blocks today"}
           </div>
-          <Link
-            href={`/students/${popover.student.id}`}
-            className="block w-full rounded-[10px] border border-white/15 bg-white/10 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-white/15"
-          >
-            View profile
-          </Link>
+          <div className="flex flex-col gap-2">
+            {popover.student.currentPathToken && (
+              <Link
+                href={`/s/${popover.student.currentPathToken}?student=${popover.student.id}`}
+                data-testid="popover-view-blocks"
+                className="block w-full rounded-[10px] bg-[#58b6fa] px-3 py-2 text-center text-xs font-bold text-black hover:opacity-90"
+              >
+                View current blocks ↗
+              </Link>
+            )}
+            <Link
+              href={`/students/${popover.student.id}`}
+              className="block w-full rounded-[10px] border border-white/15 bg-white/10 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-white/15"
+            >
+              View profile
+            </Link>
+          </div>
         </div>
       )}
     </GalaxyField>

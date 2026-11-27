@@ -31,6 +31,7 @@ import {
   isBlockUnlocked,
   isCorrectRiddle,
   nextAttemptState,
+  resolveInitialStudent,
   type MosaicBlock,
   type RawPathPayload,
 } from "@/lib/student-path/deck";
@@ -65,6 +66,7 @@ export function BlockFlip({
   payload,
   initialCompletedIds,
   roster,
+  initialStudentId,
   initialCollectiblesByStudent,
   simulationEnabled = false,
   demoStudentIds,
@@ -73,12 +75,15 @@ export function BlockFlip({
   payload: RawPathPayload;
   initialCompletedIds: string[];
   roster: StudentRosterItem[];
+  initialStudentId?: string | null;
   initialCollectiblesByStudent?: Record<string, StudentCollectiblesBundle>;
   simulationEnabled?: boolean;
   demoStudentIds?: string[];
 }) {
   const deck = useMemo(() => buildMosaicDeck(payload), [payload]);
-  const [student, setStudent] = useState<StudentRosterItem | null>(null);
+  const [student, setStudent] = useState<StudentRosterItem | null>(() =>
+    resolveInitialStudent(roster, initialStudentId),
+  );
   const [activeTab, setActiveTab] = useState<"blocks" | "inventory">("blocks");
   const [completedIds, setCompletedIds] =
     useState<string[]>(initialCompletedIds);

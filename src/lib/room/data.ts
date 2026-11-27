@@ -460,6 +460,7 @@ export async function getRoomSnapshot(): Promise<RoomSnapshot> {
         subjectBands,
         subjectWeeks,
         currentLessonTitle: activeLessonTitle,
+        currentPathToken: activeLessonTitle ? "demo-space-lesson" : null,
         equipped: equippedByStudent.get(stu.id) ?? {},
         interventionStatus,
         alert,

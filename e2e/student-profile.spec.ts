@@ -29,7 +29,7 @@ test("renders Maya profile with Bklit Weaver Wheel, Check-ins, Mastery chart, an
   await expect(page.getByRole("heading", { name: "Maya" })).toBeVisible();
   await expect(page.getByTestId("view-current-blocks")).toHaveAttribute(
     "href",
-    "/s/demo-space-lesson",
+    `/s/demo-space-lesson?student=${mayaId}`,
   );
 
   // Weaver Wheel radar chart renders 5 zone labels
@@ -130,6 +130,29 @@ test("renders Maya profile with Bklit Weaver Wheel, Check-ins, Mastery chart, an
   await expect(page.getByTestId("iv-approved-badge")).toBeVisible();
 
   expect(pageErrors).toEqual([]);
+});
+
+test("clicking View Current Blocks opens Maya's blocks directly without roster-picker", async ({
+  page,
+  request,
+}) => {
+  const roomData = (await (await request.get("/api/room")).json()) as {
+    students: { id: string; firstName: string }[];
+  };
+  const mayaId = roomData.students.find((s) => s.firstName === "Maya")!.id;
+
+  await page.goto(`/students/${mayaId}`, { waitUntil: "domcontentloaded" });
+  const blocksLink = page.getByTestId("view-current-blocks");
+  await expect(blocksLink).toHaveAttribute(
+    "href",
+    `/s/demo-space-lesson?student=${mayaId}`,
+  );
+  await blocksLink.click();
+
+  await expect(page).toHaveURL(`/s/demo-space-lesson?student=${mayaId}`);
+  await expect(page.getByTestId("roster-picker")).toHaveCount(0);
+  await expect(page.getByTestId("mosaic-grid")).toBeVisible();
+  await expect(page.locator("header")).toContainText("Maya");
 });
 
 test("renders clean not-found fallback for unknown student UUID", async ({ page }) => {

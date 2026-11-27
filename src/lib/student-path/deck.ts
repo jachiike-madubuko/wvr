@@ -38,6 +38,15 @@ function toMosaicBlock(entry: FlipBlock): MosaicBlock {
   };
 }
 
+export function resolveInitialStudent<T extends { id: string }>(
+  roster: readonly T[],
+  initialStudentId?: string | null,
+): T | null {
+  const trimmed = initialStudentId?.trim();
+  if (!trimmed) return null;
+  return roster.find((item) => item.id === trimmed) ?? null;
+}
+
 export function buildMosaicDeck(payload: RawPathPayload): MosaicBlock[] {
   const isSpaceDeck = !payload.packId || payload.packId === "pack_space";
   if (isSpaceDeck) {

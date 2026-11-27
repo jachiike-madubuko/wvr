@@ -15,6 +15,7 @@ import {
   isBlockUnlocked,
   isCorrectRiddle,
   nextAttemptState,
+  resolveInitialStudent,
 } from "@/lib/student-path/deck";
 
 test("block library defines 4 roles and 21 sub-types across 6 types", () => {
@@ -152,4 +153,22 @@ test("assertAllowedPayload permits allowlisted event keys and rejects extra or P
       firstName: "Maya",
     }),
   ).toThrow("EVENT_KEY_NOT_ALLOWED:student.block_submitted.firstName");
+});
+
+test("resolveInitialStudent matches valid roster ID and fails closed for unknown or omitted IDs", () => {
+  const roster = [
+    { id: "11111111-1111-4111-8111-111111111111", firstName: "Maya" },
+    { id: "22222222-2222-4222-8222-222222222222", firstName: "Leo" },
+  ];
+
+  expect(resolveInitialStudent(roster, "11111111-1111-4111-8111-111111111111")).toEqual(
+    roster[0],
+  );
+  expect(resolveInitialStudent(roster, "  22222222-2222-4222-8222-222222222222  ")).toEqual(
+    roster[1],
+  );
+  expect(resolveInitialStudent(roster, "99999999-9999-4999-8999-999999999999")).toBeNull();
+  expect(resolveInitialStudent(roster, undefined)).toBeNull();
+  expect(resolveInitialStudent(roster, null)).toBeNull();
+  expect(resolveInitialStudent(roster, "   ")).toBeNull();
 });

@@ -125,7 +125,7 @@ export function StudentProfileRoom({
 
         <div className="flex items-center gap-3">
           <Link
-            href={`/s/${profile.currentPathToken}`}
+            href={`/s/${profile.currentPathToken}?student=${profile.studentId}`}
             data-testid="view-current-blocks"
             className="rounded-full bg-[#58b6fa] px-4 py-2 text-xs font-bold text-black hover:opacity-90"
           >

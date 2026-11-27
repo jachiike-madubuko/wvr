@@ -6,10 +6,16 @@ export const dynamic = "force-dynamic";
 
 export default async function StudentPathPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ student?: string | string[] }>;
 }) {
-  const { token } = await params;
+  const [{ token }, query] = await Promise.all([params, searchParams]);
+  const initialStudentId =
+    typeof query.student === "string" && query.student.trim()
+      ? query.student.trim()
+      : null;
   const [data, simContext] = await Promise.all([
     openStudentPath(token),
     getDemoSimulationContext(token),
@@ -31,10 +37,12 @@ export default async function StudentPathPage({
 
   return (
     <BlockFlip
+      key={`${token}:${initialStudentId ?? ""}`}
       token={token}
       payload={data.payload}
       initialCompletedIds={data.progress.completedBlockIds ?? []}
       roster={data.roster}
+      initialStudentId={initialStudentId}
       initialCollectiblesByStudent={data.collectiblesByStudent}
       simulationEnabled={simContext.enabled}
       demoStudentIds={simContext.demoStudentIds}

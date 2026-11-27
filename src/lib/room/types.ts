@@ -30,6 +30,7 @@ export type RoomStudent = {
   subjectBands: Record<string, PaceBand>;
   subjectWeeks?: Record<string, number>;
   currentLessonTitle: string | null;
+  currentPathToken: string | null;
   equipped?: EquippedLoadout;
   isDemo?: boolean;
   interventionStatus?: InterventionStatus;
