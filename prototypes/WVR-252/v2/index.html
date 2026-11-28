@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>WVR-252 · v2 · Decision-point preview</title>
+<style>
+:root{--page:#0b1020;--panel:#111728;--text:#f6f1ea;--muted:#8892b0;--accent:#58b6fa;--err:#ff7a7a;--line:rgba(255,255,255,.1);--proto:#f2c14e;--force:#f0a35e}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+button{font:inherit;color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+.muted{color:var(--muted)}
+h1{font-size:24px;margin:2px 0 0}
+h2{font-size:17px;margin:0 0 6px}
+p{margin:0}
+.proto{background:repeating-linear-gradient(135deg,#1a1a10 0 10px,#15150d 10px 20px);border-bottom:2px dashed var(--proto)}
+.proto-in{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-top:10px;padding-bottom:10px}
+.proto-label{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--proto);margin-right:4px;white-space:nowrap}
+.pbtn{min-height:36px;padding:0 12px;border:1px dashed var(--proto);background:#20200f;border-radius:6px;font:500 13px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#f3e3b0;cursor:pointer;white-space:nowrap}
+.pbtn[aria-pressed="true"]{background:var(--proto);color:#1a1405;border-style:solid}
+.pbtn:hover{filter:brightness(1.15)}
+.seg{display:flex;gap:8px}
+.proto-msg{font:12px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#f3e3b0;min-width:0;flex:1 1 200px}
+.top{padding:16px 0 8px}
+.eyebrow{font-size:12px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.banner{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 14px;color:var(--muted);font-size:13px;background:rgba(255,255,255,.02)}
+.banner-text{flex:1;min-width:0;padding-top:6px}
+.banner.collapsed .b2{display:none}
+.banner.collapsed{padding-top:4px;padding-bottom:4px}
+.banner.collapsed .banner-text{padding-top:4px}
+.banner-tog{flex:none;min-height:36px;min-width:84px;border:1px solid var(--line);background:transparent;border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px}
+.tests{color:var(--muted);font-size:13px;margin:8px 0 14px}
+main{padding-bottom:16px}
+.foot{color:var(--muted);font-size:12px;padding:12px 0 28px;border-top:1px solid var(--line)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:18px}
+.btn{min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:transparent;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:disabled{cursor:not-allowed;opacity:.55}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#06121f}
+.btn.ghost{color:var(--text)}
+.btn:focus-visible,.pbtn:focus-visible,.banner-tog:focus-visible,.tbadge:focus-visible,.forcebtn:focus-visible,.pickbtn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tag{display:inline-block;font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px;vertical-align:middle;white-space:nowrap}
+.name{font-weight:700;font-size:18px}
+.idrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-bottom:14px}
+.today{margin-left:auto;font-size:14px;color:var(--text);background:rgba(88,182,250,.1);border:1px solid rgba(88,182,250,.3);padding:6px 12px;border-radius:999px;white-space:nowrap}
+.grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+.col{display:grid;gap:16px}
+.fix{font-size:12px;color:var(--muted);border-left:3px solid rgba(242,193,78,.55);padding:6px 10px;margin-top:8px;border-radius:0 8px 8px 0;background:rgba(242,193,78,.05)}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:600;white-space:nowrap}
+.chip.cur{border-color:rgba(88,182,250,.5)}
+.kv{display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap}
+.note{border-radius:14px;padding:10px 14px;font-size:14px;margin:8px 0;border:1px solid var(--line)}
+.note.wait{border-color:rgba(242,193,78,.45);background:rgba(242,193,78,.07)}
+.note.sched{border-color:rgba(88,182,250,.45);background:rgba(88,182,250,.07)}
+.note.deny{border-color:rgba(255,122,122,.45);background:rgba(255,122,122,.06)}
+.note.done{border-color:rgba(126,224,161,.45);background:rgba(126,224,161,.06)}
+.note.force{border-color:rgba(240,163,94,.5);background:rgba(240,163,94,.08)}
+.reasons{display:grid;gap:6px;margin-top:8px;font-size:14px}
+.reasons .r{display:flex;gap:8px;align-items:flex-start}
+.reasons .k{color:var(--muted);flex:none;width:108px}
+.gate{margin-top:4px}
+.meter{font-size:15px;font-weight:600}
+/* map */
+.ring{width:100%;max-width:480px;height:auto;display:block;margin:8px auto 0}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+/* travel button skin */
+.skinbtn{position:relative;overflow:hidden;width:100%;min-height:60px;padding:0;border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;border-radius:12px;cursor:pointer;font:inherit}
+.skinbtn .swatch{position:absolute;inset:0;width:100%;height:100%;border-radius:0}
+.skinlbl{position:relative;background:rgba(6,12,24,.88);color:#fff;padding:8px 16px;border-radius:10px;font-weight:700;font-size:16px}
+.skinbtn:hover{border-color:#fff}
+.delaynote{font-size:13px;color:var(--muted);margin:8px 0 0}
+.statepill{width:100%;font:inherit;font-weight:600;display:flex;align-items:center;justify-content:center;min-height:60px;border:1px dashed rgba(255,255,255,.25);border-radius:12px;color:var(--muted);background:transparent;cursor:not-allowed;user-select:none}
+/* teacher */
+.tgrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start}
+.srow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.sint{color:var(--muted);font-size:14px}
+.tbadge{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--err);background:rgba(255,122,122,.12);color:var(--text);font-weight:700;cursor:pointer;white-space:nowrap}
+.tbadge .adot{width:10px;height:10px;border-radius:50%;background:var(--err);box-shadow:0 0 0 3px rgba(255,122,122,.25)}
+.forcebtn{margin-left:auto;min-height:44px;padding:0 16px;border-radius:12px;border:2px solid var(--force);background:transparent;color:var(--force);font-weight:700;cursor:pointer;white-space:nowrap}
+.forcebtn:hover{background:rgba(240,163,94,.1)}
+.shint{margin-left:auto;font-size:13px;color:var(--muted);border:1px dashed var(--line);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.toast{font-size:14px;color:var(--muted);margin-top:10px;min-height:20px}
+.tl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.tl li{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+.tl .approved{border-left:3px solid var(--accent)}
+.tl .forced{border-left:3px solid var(--force)}
+.tl .kind{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tl .approved .kind{color:var(--accent)}
+.tl .forced .kind{color:var(--force)}
+.empty{color:var(--muted);font-size:14px;margin-top:8px}
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(3,6,14,.72);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10}
+.scrim[hidden]{display:none}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:22px;width:min(460px,100%)}
+.mhead{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.mhead h2{flex:1;margin:0;font-size:19px}
+.mx{min-height:40px;min-width:72px}
+.mfacts{display:grid;gap:8px;margin:12px 0 16px;font-size:15px}
+.mfacts .row{display:flex;gap:10px;align-items:center}
+.mfacts .k{color:var(--muted);width:150px;flex:none}
+.mnote{color:var(--muted);font-size:12px;margin-top:12px}
+.mact{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn.approve{color:var(--accent);border:2px solid var(--accent);background:rgba(88,182,250,.06)}
+.btn.deny{color:var(--err);border:2px solid var(--err);background:rgba(255,122,122,.06)}
+.btn.confirm{color:var(--force);border:2px solid var(--force);background:rgba(240,163,94,.08)}
+/* pick */
+.picks{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.pickbtn{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;font-weight:600}
+.pickbtn:hover{border-color:var(--accent)}
+.pickstage{padding:22px}
+/* v2 strip */
+.strip{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px;border:1px dashed rgba(88,182,250,.5);border-radius:16px;padding:10px}
+.strip figure{margin:0;font-size:13px}
+.strip .swatch{display:block;width:100%;height:56px;border-radius:10px}
+.strip figcaption{margin-top:6px;color:var(--muted)}
+.strip .lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+/* v3 upcoming card */
+.upcoming{border:2px dashed rgba(240,163,94,.55);border-radius:16px;padding:14px 16px;background:rgba(240,163,94,.06)}
+.upcoming .lbl{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--force)}
+.variant-v3 .grid2.picking{grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr)}
+
+</style>
+</head>
+<body class="variant-v2">
+<div class="proto" role="region" aria-label="Proto controls (prototype only, not app UI)">
+  <div class="wrap proto-in">
+    <span class="proto-label">Proto controls · prototype only</span>
+    <div class="seg" role="group" aria-label="Prototype view switch">
+      <button type="button" class="pbtn" id="viewStudent" data-act="view" data-view="student">Student view</button>
+      <button type="button" class="pbtn" id="viewTeacher" data-act="view" data-view="teacher">Teacher view</button>
+    </div>
+    <button type="button" class="pbtn" id="credBelow" data-act="below">Set credits below target (fixture)</button>
+    <button type="button" class="pbtn" id="credAbove" data-act="above">Set credits at target (fixture)</button>
+    <button type="button" class="pbtn" id="delayBtn" data-act="delay" title="Stand-in for the later boundary (OQ-6). Does not apply a change immediately.">Trigger delayed boundary (stand-in)</button>
+    <button type="button" class="pbtn" id="resetBtn" data-act="reset">Reset demo</button>
+    <span id="protoMsg" class="proto-msg" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">WVR-252 · v2 · Decision-point preview</p>
+    <h1 id="viewTitle">Student view</h1>
+  </header>
+  <div class="banner" id="banner">
+    <p class="banner-text" id="bannerText"><span class="b1">Proposed defaults, not decided: see Open questions in stories.md.</span><span class="b2"> This file is a prototype, not the app.</span></p>
+    <button type="button" class="banner-tog" id="bannerTog" data-act="banner" aria-expanded="true" aria-controls="bannerText">Collapse</button>
+  </div>
+  <p class="tests">Tests (v2-only extra): besides the required destination-skin Travel button, a current-vs-destination look strip at the decision point, labeled as a look preview only and not applied. Does a stronger preview make the request clearer without looking like the move already happened?</p>
+  <main>
+    <section id="student" aria-label="Student view"></section>
+    <section id="teacher" aria-label="Teacher view" hidden></section>
+  </main>
+  <footer class="foot">Prototype: saved on this device only.</footer>
+</div>
+<div id="scrim" class="scrim" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div>
+</div>
+<script>
+(function(){
+'use strict';
+var V = 'v2';
+var KEY = 'wvr252:' + V + ':state';
+var TARGET = 10; // fixture amount, not a product rule (OQ-2)
+var SEED_CREDITS = 4;
+var LABEL = {space:'Space', ocean:'Ocean', plants:'Plants', ballet:'Ballet', past:'Digging up the past'};
+var ORDER = ['space','ballet','plants','past','ocean'];
+// One adjacent travel target offered (same fixture as locked v4: Space → Ocean).
+var ADJ = {space:'ocean', ocean:'space', ballet:'space', plants:'ballet', past:'ocean'};
+function dest(){ return ADJ[S.interest]; }
+function nonadj(){
+  var skip = [S.interest, dest()];
+  if (skip.indexOf('plants') < 0) return 'plants';
+  if (skip.indexOf('past') < 0) return 'past';
+  return 'ballet';
+}
+function seed(){ return {interest:'space', credits:SEED_CREDITS, request:null, force:null, last:null, view:'student', timeline:[]}; }
+function load(){
+  try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && LABEL[s.interest] && typeof s.credits === 'number') return s; } catch(e) {}
+  return seed();
+}
+var S = load();
+var ui = {toast:'', modal:null}; // modal: 'approve' | 'force' | null
+function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
+function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function $(id){ return document.getElementById(id); }
+function protoMsg(t){ $('protoMsg').textContent = t || ''; }
+function ready(){ return S.credits >= TARGET; }
+function busy(){ return !!(S.request || (S.force && S.force.status)); }
+
+function skinDefs(skin, idp){
+  var stops = {
+    ocean:  ['#0e4d6b','#06283d'],
+    space:  ['#1b1640','#0a0c1f'],
+    ballet: ['#4a2040','#1a0c18'],
+    plants: ['#163820','#0a1a10'],
+    past:   ['#3a2a18','#1a140c']
+  }[skin] || ['#1b1640','#0a0c1f'];
+  return '<linearGradient id="'+idp+'g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+stops[0]+'"/><stop offset="1" stop-color="'+stops[1]+'"/></linearGradient>';
+}
+function skinDecor(skin){
+  if (skin === 'ocean') return '<path d="M0 60 q15 -8 30 0 t30 0 t30 0 t30 0 t30 0 t30 0" stroke="#5fd3e6" stroke-opacity=".35" fill="none" stroke-width="3"/><path d="M0 110 q15 -8 30 0 t30 0 t30 0 t30 0 t30 0 t30 0" stroke="#5fd3e6" stroke-opacity=".25" fill="none" stroke-width="3"/>';
+  if (skin === 'plants') return '<circle cx="40" cy="70" r="18" fill="#2f7a45" fill-opacity=".45"/><circle cx="130" cy="40" r="14" fill="#3d8f52" fill-opacity=".4"/>';
+  if (skin === 'ballet') return '<circle cx="90" cy="50" r="20" fill="#e8a0c8" fill-opacity=".25"/>';
+  if (skin === 'past') return '<rect x="20" y="80" width="40" height="16" rx="2" fill="#c4a574" fill-opacity=".35"/>';
+  return '<circle cx="20" cy="24" r="1.6" fill="#fff"/><circle cx="150" cy="18" r="1.4" fill="#fff"/><circle cx="160" cy="80" r="1.2" fill="#fff"/><circle cx="30" cy="120" r="1.3" fill="#fff"/><circle cx="148" cy="44" r="14" fill="#7b5cff" fill-opacity=".45"/>';
+}
+function scene(skin, idp){
+  return '<svg class="swatch" viewBox="0 0 180 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>'+skinDefs(skin,idp)+'</defs><rect width="180" height="120" fill="url(#'+idp+'g)"/>'+skinDecor(skin)+'</svg>';
+}
+
+function ringSvg(who){
+  var pts = {}, s = '', cur = S.interest, d = dest(), na = nonadj();
+  ORDER.forEach(function(k,i){ var a = -Math.PI/2 + i*2*Math.PI/5; pts[k] = [210+130*Math.cos(a), 150+110*Math.sin(a)]; });
+  s += '<svg class="ring" viewBox="0 0 420 300" role="img" aria-label="Galaxy map. Current interest: '+LABEL[cur]+'. Adjacent: '+LABEL[d]+'. Not next to current: '+LABEL[na]+'.">';
+  ORDER.forEach(function(k,i){ var n = pts[ORDER[(i+1)%5]], p = pts[k]; s += '<line x1="'+p[0]+'" y1="'+p[1]+'" x2="'+n[0]+'" y2="'+n[1]+'" stroke="rgba(255,255,255,.12)" stroke-width="2"/>'; });
+  ORDER.forEach(function(k){
+    var p = pts[k], on = k === cur, adj = k === d, far = k === na;
+    var fill = on ? '#1d3a5c' : adj && ready() && !busy() ? '#16382a' : '#161d33';
+    var stroke = on ? '#58b6fa' : far ? 'rgba(255,255,255,.18)' : adj ? (ready() && !busy() ? '#7ee0a1' : 'rgba(242,193,78,.7)') : 'rgba(255,255,255,.18)';
+    s += '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(on?28:18)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2"/>';
+    if (on) s += '<text x="'+p[0]+'" y="'+(p[1]+4)+'" fill="#f6f1ea" font-size="11" font-weight="700" text-anchor="middle">A</text>';
+    var sub = on ? 'Current' : adj ? (ready() && !S.request && !(S.force && S.force.status) ? 'Adjacent · ready' : (S.request || (S.force && S.force.status) ? 'Adjacent' : 'Adjacent · locked')) : far ? 'Not next to you' : '';
+    s += '<text x="'+p[0]+'" y="'+(p[1]+(on?46:36))+'" fill="'+(on?'#f6f1ea':'#8892b0')+'" font-size="13" text-anchor="middle">'+esc(LABEL[k])+'</text>';
+    if (sub) s += '<text x="'+p[0]+'" y="'+(p[1]+(on?62:52))+'" fill="#8892b0" font-size="10" text-anchor="middle">'+esc(sub)+'</text>';
+  });
+  return s + '</svg>';
+}
+
+function creditBlock(){
+  var d = dest(), na = nonadj(), h = '';
+  h += '<section class="panel gate" id="gatePanel" aria-labelledby="gateH"><h2 id="gateH">Credit gate</h2>';
+  h += '<p class="meter" id="credLine">'+S.credits+' of '+TARGET+' credits</p>';
+  h += '<p class="fix" id="credFixture">Fixture amount, not a product rule. Not the target for every interest.</p>';
+  h += '<div class="reasons">';
+  if (S.request && S.request.status === 'pending') {
+    h += '<p class="r" id="adjReason"><span class="k">Adjacent</span><span id="adjStatus">'+esc(LABEL[d])+' — request waiting, not a credit lock.</span></p>';
+  } else if (S.request && S.request.status === 'scheduled') {
+    h += '<p class="r" id="adjReason"><span class="k">Adjacent</span><span id="adjStatus">'+esc(LABEL[d])+' — approved, not applied yet.</span></p>';
+  } else if (S.force && S.force.status) {
+    h += '<p class="r" id="adjReason"><span class="k">Adjacent</span><span id="adjStatus">Adjacent travel is paused while a forced change is scheduled. You will pick later. This is not a credit lock, and no destination has been chosen.</span></p>';
+  } else if (ready()) {
+    h += '<p class="r" id="adjReason"><span class="k">Adjacent</span><span id="adjStatus">'+esc(LABEL[d])+' is ready to travel. The credit target (fixture) is met.</span></p>';
+  } else {
+    h += '<p class="r" id="adjReason"><span class="k">Adjacent</span><span id="adjStatus">'+esc(LABEL[d])+' is locked: not enough credits (fixture target). No Travel action yet.</span></p>';
+  }
+  h += '<p class="r" id="naReason"><span class="k">Not adjacent</span><span id="naStatus">'+esc(LABEL[na])+' is not next to '+esc(LABEL[S.interest])+', so it can\'t be a Travel target. This is not a credit lock.</span></p>';
+  h += '</div></section>';
+  return h;
+}
+
+function lookStrip(){
+  var cur = LABEL[S.interest], d = dest(), dl = LABEL[d];
+  return '<div class="strip" id="lookStrip"><p class="lbl" style="grid-column:1/-1">Look preview only · not applied. You are still on '+esc(cur)+'. This is not a change to what you wear.</p>'
+    + '<figure>'+scene(S.interest,'stc')+'<figcaption>Current: <strong style="color:var(--text)">'+esc(cur)+'</strong></figcaption></figure>'
+    + '<figure>'+scene(d,'std')+'<figcaption>Destination look: <strong style="color:var(--text)">'+esc(dl)+'</strong></figcaption></figure></div>';
+}
+function travelPanel(){
+  var cur = LABEL[S.interest], d = dest(), dl = LABEL[d], r = S.request, h = '';
+  h += '<section class="panel" id="travelPanel" aria-labelledby="trH"><h2 id="trH">Travel</h2>';
+  h += '<div class="kv"><span class="muted">Current interest</span><span class="chip cur" id="curInterest">'+esc(cur)+'</span></div>';
+  if (r && r.status === 'pending') {
+    h += '<div class="note wait" id="reqStatus" role="status"><strong>Waiting for your teacher.</strong> You asked to travel from '+esc(cur)+' to '+esc(LABEL[r.to])+'. You stay on '+esc(cur)+' for today\'s work (fixture tone).</div>';
+    h += '<button type="button" class="statepill" id="travelBtn" disabled>Request sent · waiting</button>';
+    if (V === 'v2') h += lookStrip();
+  } else if (r && r.status === 'scheduled') {
+    h += '<div class="note sched" id="reqStatus" role="status"><strong>Your teacher said yes to '+esc(LABEL[r.to])+'. It does not apply yet.</strong> You finish today\'s work on '+esc(cur)+' first. The change comes later (stand-in timing, not decided).</div>';
+    h += '<button type="button" class="statepill" id="travelBtn" disabled>Approved, not applied yet</button>';
+    if (V === 'v2') h += lookStrip();
+  } else if (S.force && S.force.status === 'scheduled') {
+    h += '<div class="note force" id="reqStatus" role="status"><strong>A change is coming.</strong> You will pick the new interest at the boundary. No destination has been chosen. You stay on '+esc(cur)+' for now (stand-in timing, not decided).</div>';
+    h += '<button type="button" class="statepill" id="travelBtn" disabled>Travel paused · a change is coming</button>';
+  } else if (S.force && S.force.status === 'picking') {
+    h += '<div class="note force" id="reqStatus" role="status"><strong>Pick a new interest.</strong> You are still on '+esc(cur)+' until you choose. The teacher did not pick for you.</div>';
+  } else {
+    if (S.last === 'denied') h += '<div class="note deny" id="reqStatus" role="status">Your teacher said not now. You are still on '+esc(cur)+'. You can ask again.</div>';
+    if (S.last === 'applied' || S.last === 'forced-applied') {
+      h += '<div class="note done" id="reqStatus" role="status"><strong>You moved to '+esc(cur)+'.</strong></div>';
+      h += '<p class="fix" id="carryLabel">Fixture: credits carried over, not a product rule.</p>';
+    }
+    if (ready()) {
+      h += '<button type="button" class="skinbtn" id="travelBtn" data-act="travel" data-skin="'+d+'">'+scene(d,'tb')+'<span class="skinlbl">Travel to '+esc(dl)+'</span></button>';
+      h += '<p class="delaynote" id="delayNote">The button shows the '+esc(dl)+' look. You stay on '+esc(cur)+' until your teacher decides, and a yes does not apply right away (stand-in wording).</p>';
+      if (V === 'v2') h += lookStrip();
+    } else {
+      h += '<button type="button" class="statepill" id="travelBtn" disabled>Travel locked · not enough credits (fixture)</button>';
+    }
+  }
+  return h + '</section>';
+}
+
+function pickPanel(){
+  var cur = S.interest, h = '';
+  var cls = V === 'v3' ? 'panel pickstage' : 'panel';
+  h += '<section class="'+cls+'" id="pickPanel" aria-labelledby="pickH"><h2 id="pickH">Pick your next interest</h2>';
+  h += '<p>A delayed change is ready to apply. You are still on <strong id="pickCur">'+esc(LABEL[cur])+'</strong> (current). Choose a new interest; only then do you move. The teacher did not pick this for you.</p>';
+  h += '<div class="picks" id="pickSet">';
+  ORDER.forEach(function(k){
+    if (k === cur) return;
+    h += '<button type="button" class="pickbtn" data-act="pick" data-to="'+k+'" id="pick-'+k+'">'+esc(LABEL[k])+'</button>';
+  });
+  h += '</div>';
+  h += '<p class="fix" id="pickFixture">Fixture: this choice set is proposed. Stay is not offered in this prototype (not a product rule).</p>';
+  return h + '</section>';
+}
+
+function upcomingCard(){
+  return '<section class="panel upcoming" id="upcomingCard"><p class="lbl">Upcoming pick</p><p><strong>A change is coming.</strong> You will choose the new interest at the boundary. No destination has been named or chosen. You are still on <strong>'+esc(LABEL[S.interest])+'</strong>.</p></section>';
+}
+
+function student(){
+  var cur = LABEL[S.interest], picking = S.force && S.force.status === 'picking';
+  var h = '<div class="idrow"><span class="name">Student A</span><span class="tag">Prototype pseudonym</span>';
+  h += '<span class="today" id="today">Today\'s work: '+esc(cur)+' (fixture tone)</span></div>';
+  if (picking && V === 'v3') {
+    h += '<div class="grid2 picking">'+pickPanel()+'<div class="col">'+creditBlock()+'<section class="panel" aria-labelledby="mapH"><h2 id="mapH">Galaxy map</h2><p class="muted">Simplified stand-in. Not the 3D room.</p>'+ringSvg('s')+'</section></div></div>';
+    return h;
+  }
+  h += '<div class="grid2"><section class="panel" aria-labelledby="mapH"><h2 id="mapH">Galaxy map</h2><p class="muted">Simplified stand-in. Not the 3D room or calendar. Interest labels are fixtures.</p>'+ringSvg('s');
+  h += '<p class="legend"><span><i style="background:#58b6fa"></i>Current</span><span><i style="background:#f2c14e"></i>Adjacent (credit-gated)</span><span><i style="background:#8892b0"></i>Not next to you</span></p></section>';
+  h += '<div class="col">';
+  if (picking) h += pickPanel();
+  if (V === 'v3' && S.force && S.force.status === 'scheduled') h += upcomingCard();
+  if (V === 'v2') h += travelPanel() + creditBlock();
+  else h += creditBlock() + travelPanel();
+  h += '</div></div>';
+  return h;
+}
+
+function teacher(){
+  var r = S.request, cur = LABEL[S.interest], h = '';
+  h += '<div class="idrow"><span class="name">Teacher</span><span class="muted">Class</span></div>';
+  h += '<div class="tgrid"><section class="panel" aria-labelledby="galH"><h2 id="galH">Galaxy Homepage</h2><p class="muted">Simplified stand-in: class interest groups. Not the 3D room or calendar.</p>'+ringSvg('t')+'</section>';
+  h += '<div class="col"><section class="panel" aria-labelledby="rosH"><h2 id="rosH">Class</h2><div class="srow" id="rowA"><span class="name" style="font-size:16px">Student A</span><span class="tag">Prototype pseudonym</span><span class="sint">Interest: <span id="tInterest">'+esc(cur)+'</span></span>';
+  if (r && r.status === 'pending') h += '<button type="button" class="tbadge" id="teacherBadge" data-act="openApprove" aria-haspopup="dialog" aria-label="Student A has a travel request. Open."><span class="adot"></span>Travel request</button>';
+  else if (r && r.status === 'scheduled') h += '<span class="shint" id="schedHint">Scheduled: '+esc(LABEL[r.to])+' later · still on '+esc(cur)+'</span>';
+  else if (S.force && S.force.status) h += '<span class="shint" id="forceHint">Forced switch scheduled · Student A will pick later</span>';
+  else h += '<button type="button" class="forcebtn" id="forceBtn" data-act="openForce">Force switch</button>';
+  h += '</div><p class="toast" id="tToast" role="status">'+esc(ui.toast)+'</p></section>';
+  h += '<section class="panel" id="timelinePanel" aria-labelledby="tlH"><h2 id="tlH">Timeline</h2><p class="muted">Approved and forced switches. Fixture log, this device only.</p>';
+  if (!S.timeline.length) h += '<p class="empty" id="tlEmpty">No entries yet.</p>';
+  else {
+    h += '<ol class="tl" id="timeline">';
+    S.timeline.forEach(function(e, i){
+      h += '<li class="'+e.kind+'" data-tl="'+i+'"><span class="kind">'+esc(e.kind === 'approved' ? 'Approved switch' : 'Forced switch')+'</span><p>'+esc(e.text)+'</p></li>';
+    });
+    h += '</ol>';
+  }
+  h += '</section></div></div>';
+  return h;
+}
+
+function modal(){
+  var h = '<div class="mhead"><h2 id="mTitle"></h2><button type="button" class="btn ghost mx" id="mClose" data-act="close">Close</button></div>';
+  if (ui.modal === 'approve' && S.request && S.request.status === 'pending') {
+    h = h.replace('></h2>', '>Travel request</h2>');
+    h += '<p><span class="name" style="font-size:16px">Student A</span> <span class="tag">Prototype pseudonym</span></p>';
+    h += '<div class="mfacts"><div class="row"><span class="k">Current interest</span><strong id="mCur">'+esc(LABEL[S.interest])+'</strong></div><div class="row"><span class="k">Requested interest</span><strong id="mReq">'+esc(LABEL[S.request.to])+'</strong></div></div>';
+    h += '<div class="mact"><button type="button" class="btn deny" id="mDeny" data-act="deny">✕ Deny</button><button type="button" class="btn approve" id="mApprove" data-act="approve">✓ Approve</button></div>';
+    h += '<p class="mnote">One tap. No reason field in this prototype only (OQ-4). Approve schedules the change for later; it does not apply now.</p>';
+  } else if (ui.modal === 'force') {
+    h = h.replace('></h2>', '>Force a switch</h2>');
+    h += '<p><span class="name" style="font-size:16px">Student A</span> <span class="tag">Prototype pseudonym</span> is on <strong>'+esc(LABEL[S.interest])+'</strong>.</p>';
+    h += '<p style="margin:12px 0">You do not choose the destination. Student A will pick the new interest at the boundary.</p>';
+    h += '<div class="mact"><button type="button" class="btn ghost" id="mCancel" data-act="close">Cancel</button><button type="button" class="btn confirm" id="mConfirmForce" data-act="confirmForce">Confirm force</button></div>';
+    h += '<p class="mnote">Short confirm only. No reason field in this prototype only (OQ-4). The change does not apply now.</p>';
+  }
+  return h;
+}
+
+var lastFocus = null;
+function render(){
+  var st = S.view === 'student';
+  $('student').hidden = !st; $('teacher').hidden = st;
+  $('student').innerHTML = st ? student() : '';
+  $('teacher').innerHTML = st ? '' : teacher();
+  $('viewTitle').textContent = st ? 'Student view · Galaxy map' : 'Teacher view · Galaxy Homepage';
+  $('viewStudent').setAttribute('aria-pressed', st); $('viewTeacher').setAttribute('aria-pressed', !st);
+  var open = !st && (ui.modal === 'approve' && S.request && S.request.status === 'pending' || ui.modal === 'force');
+  if (!open) ui.modal = null;
+  $('scrim').hidden = !open;
+  $('modal').innerHTML = open ? modal() : '';
+}
+function focusId(id){ var e = $(id); if (e) e.focus({preventScroll:true}); }
+
+function act(a, el){
+  if (a === 'view') { S.view = el.getAttribute('data-view'); ui.modal = null; ui.toast = ''; save(); render(); protoMsg(''); return; }
+  if (a === 'banner') { var b = $('banner'), c = b.classList.toggle('collapsed'); el.setAttribute('aria-expanded', !c); el.textContent = c ? 'Expand' : 'Collapse'; return; }
+  if (a === 'reset') { localStorage.removeItem(KEY); S = seed(); ui = {toast:'', modal:null}; save(); render(); protoMsg('Demo reset to seeded state.'); return; }
+  if (a === 'below') { S.credits = SEED_CREDITS; save(); render(); protoMsg('Credits set below the fixture target ('+SEED_CREDITS+' of '+TARGET+').'); return; }
+  if (a === 'above') { S.credits = TARGET; save(); render(); protoMsg('Credits set at the fixture target ('+TARGET+' of '+TARGET+').'); return; }
+  if (a === 'delay') {
+    if (S.request && S.request.status === 'scheduled') {
+      var to = S.request.to; S.interest = to; S.request = null; S.last = 'applied'; ui.toast = ''; save(); render();
+      protoMsg('Delayed boundary ran: Student A is now on ' + LABEL[to] + '. Credits carried over (fixture).');
+    } else if (S.force && S.force.status === 'scheduled') {
+      S.force.status = 'picking'; S.view = 'student'; save(); render();
+      protoMsg('Delayed boundary ran: Student A is still on ' + LABEL[S.interest] + ' and must pick.');
+    } else if (S.force && S.force.status === 'picking') {
+      protoMsg('Student A is already at the pick step. No change until they choose.');
+    } else protoMsg('Nothing scheduled. No change.');
+    return;
+  }
+  if (a === 'travel') {
+    if (S.request || (S.force && S.force.status) || !ready()) return;
+    var d = dest(); if (!d || d === nonadj()) return;
+    S.request = {status:'pending', to:d}; S.last = null; save(); render(); focusId('reqStatus'); return;
+  }
+  if (a === 'openApprove') { if (!S.request || S.request.status !== 'pending') return; lastFocus = 'teacherBadge'; ui.modal = 'approve'; render(); focusId('mClose'); return; }
+  if (a === 'openForce') { lastFocus = 'forceBtn'; ui.modal = 'force'; render(); focusId('mClose'); return; }
+  if (a === 'close') { closeModal(); return; }
+  if (a === 'approve' || a === 'deny') {
+    if (!S.request || S.request.status !== 'pending') return;
+    var to2 = LABEL[S.request.to];
+    if (a === 'approve') {
+      S.timeline.push({kind:'approved', text:'Student A · approved switch to '+to2+' (student requested it).', dest:S.request.to});
+      S.request.status = 'scheduled'; S.last = null;
+      ui.toast = 'Approved: ' + to2 + ' is scheduled for later. Student A stays on ' + LABEL[S.interest] + ' for now.';
+    } else {
+      // OQ-11 fixture: do not log a deny
+      S.request = null; S.last = 'denied';
+      ui.toast = 'Denied. Student A stays on ' + LABEL[S.interest] + ' and can ask again.';
+    }
+    ui.modal = null; save(); render(); focusId('tToast'); return;
+  }
+  if (a === 'confirmForce') {
+    S.force = {status:'scheduled'}; S.last = null;
+    S.timeline.push({kind:'forced', text:'Student A · forced switch started. Student A will pick the new interest later.', dest:null});
+    ui.toast = 'Forced switch scheduled. Student A stays put and will pick later.';
+    ui.modal = null; save(); render(); focusId('tToast'); return;
+  }
+  if (a === 'pick') {
+    if (!S.force || S.force.status !== 'picking') return;
+    var chosen = el.getAttribute('data-to');
+    if (!chosen || chosen === S.interest || !LABEL[chosen]) return;
+    S.interest = chosen; S.force = null; S.last = 'forced-applied';
+    S.timeline.push({kind:'forced', text:'Student A · forced switch: student picked '+LABEL[chosen]+'.', dest:chosen});
+    save(); render(); protoMsg('Student A picked ' + LABEL[chosen] + '. Credits carried over (fixture).');
+    return;
+  }
+}
+function closeModal(){ ui.modal = null; render(); if (lastFocus) focusId(lastFocus); }
+document.addEventListener('click', function(e){
+  var el = e.target.closest('[data-act]');
+  if (el && !el.disabled) { act(el.getAttribute('data-act'), el); return; }
+  if (e.target === $('scrim')) closeModal();
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && ui.modal) { closeModal(); e.preventDefault(); }
+  if (e.key === 'Tab' && ui.modal) {
+    var f = $('modal').querySelectorAll('button'); if (!f.length) return;
+    var first = f[0], last = f[f.length-1];
+    if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+    else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+  }
+});
+save(); render();
+})();
+
+</script>
+</body>
+</html>
