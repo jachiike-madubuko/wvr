@@ -17,7 +17,7 @@ async function getTestStudentId(request: APIRequestContext): Promise<string> {
 
 async function openEdit(page: Page, request: APIRequestContext) {
   const id = await getTestStudentId(request);
-  await page.goto(`/students/${id}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/students/${id}`, { waitUntil: "load" });
   const hadDraft = await page.evaluate((sid) => {
     const k = `weavr:wheel-draft:v1:${sid}`;
     const existed = window.localStorage.getItem(k) !== null;
@@ -25,10 +25,15 @@ async function openEdit(page: Page, request: APIRequestContext) {
     return existed;
   }, id);
   if (hadDraft) {
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.reload({ waitUntil: "load" });
   }
-  await page.getByRole("button", { name: /^(Edit|Set Weaver Wheel)$/ }).click();
-  await expect(page.getByTestId("wheel-edit-overlay")).toBeVisible();
+  const editBtn = page.getByRole("button", { name: /^(Edit|Set Weaver Wheel)$/ });
+  await expect(async () => {
+    if (await editBtn.isVisible()) {
+      await editBtn.click();
+    }
+    await expect(page.getByTestId("wheel-edit-overlay")).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: 15_000 });
   return id;
 }
 
