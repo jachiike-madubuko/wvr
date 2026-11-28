@@ -1,21 +1,22 @@
 ---
 issue_id: WVR-252
-issue_link: "https://linear.app/weaver-edu/issue/WVR-252/credit-gated-galaxy-traversal-and-teacher-forced-switch-wvr-231"
+issue_link: "https://linear.app/weaver-edu/issue/WVR-252/credit-gated-interest-switch-top-five-and-teacher-forced-switch"
 stage: build
-round: 1
+round: 2
 waiting_on: WVR.dev
-updated: "2026-11-27 17:59 MST (America/Denver)"
+updated: "2026-11-28 09:19 MST (America/Denver)"
 ---
 
 # WVR-252
 
-Stage: build. Round: 1. Waiting on: WVR.dev, to hand off to Sequoia.
+Stage: build. Round: 2 (final). Waiting on: WVR.dev, to hand off to Sequoia for `results-r2.md`.
 
-- Built from `stories.md` Revision 2 (2026-11-27). `checklist.md` has T-01 to T-44 (desktop, 1280×800).
-- Variations: `v1/` gate-first, `v2/` decision-point preview, `v3/` upcoming pick. Each `index.html` is self-contained (inline CSS/JS, no network).
-- Pre-push check: `node prototypes/WVR-252/check.cjs` (needs `playwright`; `NODE_PATH=/workspace/proto-bot/wvr231-test/node_modules`). Serves the files from a throwaway 127.0.0.1 server (same file:// localStorage lesson as WVR-231). It passed on all three before the push.
-- Leftover risks: `leftover-risk.md`. `results.md` is still the blank template for Sequoia.
-- Branch is based on `proto-loop/scaffold` (666a5cf), not on `proto/WVR-231`, so this folder stays isolated.
+- Built from `stories.md` Revision 4 and `checklist-r2.md` (T-01 to T-51, desktop 1280×800). R1 `v1`–`v3` (rejected map builds) are kept byte-identical and are not graded.
+- Variations: `v4/` list-first, `v5/` skin chips (v5-only extra), `v6/` one picker, reused at the force boundary (v6-only extra). No adjacency limit and no Galaxy map in the Student view. After the credit target is met, any of the other four in the top five can be requested, and the teacher still approves.
+- Pre-push check: `NODE_PATH=/workspace/proto-bot/wvr231-test/node_modules node prototypes/WVR-252/check.cjs` (needs `playwright`; serves the files from a throwaway 127.0.0.1 server). It also confirms `v1`–`v3` are unchanged via `check-r1.cjs`. Exit status 0 gates the push.
+- `proto-loop/scaffold` has no shared `check.cjs`, so the per-issue copy stays (generic part marked `[LIB]`).
+- Fixture list and remaining risks: `leftover-risk.md` (fixtures at the top). Sequoia's results files (`results.md`, `results-r2.md`) are not touched by Proto.
+- Branch `proto/WVR-252` is based on `proto-loop/scaffold` (666a5cf).
 
 Allowed `stage` values: `stories`, `redteam`, `build`, `test`, `improve`, `sent`, `decided`.
 

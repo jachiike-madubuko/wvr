@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>WVR-252 · v4 · List-first</title>
+<style>
+:root{--page:#0b1020;--panel:#111728;--text:#f6f1ea;--muted:#8892b0;--accent:#58b6fa;--err:#ff7a7a;--line:rgba(255,255,255,.1);--proto:#f2c14e;--force:#f0a35e}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+button{font:inherit;color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+.muted{color:var(--muted)}
+h1{font-size:24px;margin:2px 0 0}
+h2{font-size:17px;margin:0 0 6px}
+p{margin:0}
+.proto{background:repeating-linear-gradient(135deg,#1a1a10 0 10px,#15150d 10px 20px);border-bottom:2px dashed var(--proto)}
+.proto-in{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-top:10px;padding-bottom:10px}
+.proto-label{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--proto);margin-right:4px;white-space:nowrap}
+.pbtn{min-height:36px;padding:0 12px;border:1px dashed var(--proto);background:#20200f;border-radius:6px;font:500 13px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#f3e3b0;cursor:pointer;white-space:nowrap}
+.pbtn[aria-pressed="true"]{background:var(--proto);color:#1a1405;border-style:solid}
+.pbtn:hover{filter:brightness(1.15)}
+.seg{display:flex;gap:8px}
+.proto-msg{font:12px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#f3e3b0;min-width:0;flex:1 1 200px}
+.top{padding:10px 0 6px}
+.eyebrow{font-size:12px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.banner{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 14px;color:var(--muted);font-size:13px;background:rgba(255,255,255,.02)}
+.banner-text{flex:1;min-width:0;padding-top:6px}
+.banner.collapsed .b2{display:none}
+.banner.collapsed{padding-top:4px;padding-bottom:4px}
+.banner.collapsed .banner-text{padding-top:4px}
+.banner-tog{flex:none;min-height:36px;min-width:84px;border:1px solid var(--line);background:transparent;border-radius:8px;color:var(--muted);cursor:pointer;font-size:13px}
+.tests{color:var(--muted);font-size:13px;margin:6px 0 10px}
+main{padding-bottom:16px}
+.foot{color:var(--muted);font-size:12px;padding:12px 0 28px;border-top:1px solid var(--line)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:18px}
+.btn{min-height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line);background:transparent;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:disabled{cursor:not-allowed;opacity:.55}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#06121f}
+.btn.ghost{color:var(--text)}
+.btn:focus-visible,.pbtn:focus-visible,.banner-tog:focus-visible,.tbadge:focus-visible,.forcebtn:focus-visible,.pickbtn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tag{display:inline-block;font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px;vertical-align:middle;white-space:nowrap}
+.name{font-weight:700;font-size:18px}
+.idrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-bottom:10px}
+.today{margin-left:auto;font-size:14px;color:var(--text);background:rgba(88,182,250,.1);border:1px solid rgba(88,182,250,.3);padding:6px 12px;border-radius:999px;white-space:nowrap}
+.grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+.col{display:grid;gap:16px}
+.fix{font-size:12px;color:var(--muted);border-left:3px solid rgba(242,193,78,.55);padding:6px 10px;margin-top:8px;border-radius:0 8px 8px 0;background:rgba(242,193,78,.05)}
+.kv{display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap}
+.note{border-radius:14px;padding:10px 14px;font-size:14px;margin:8px 0;border:1px solid var(--line)}
+.note.wait{border-color:rgba(242,193,78,.45);background:rgba(242,193,78,.07)}
+.note.sched{border-color:rgba(88,182,250,.45);background:rgba(88,182,250,.07)}
+.note.deny{border-color:rgba(255,122,122,.45);background:rgba(255,122,122,.06)}
+.note.done{border-color:rgba(126,224,161,.45);background:rgba(126,224,161,.06)}
+.note.force{border-color:rgba(240,163,94,.5);background:rgba(240,163,94,.08)}
+.reasons{display:grid;gap:6px;margin-top:8px;font-size:14px}
+.reasons .r{display:flex;gap:8px;align-items:flex-start}
+.reasons .k{color:var(--muted);flex:none;width:108px}
+.gate{margin-top:4px}
+.meter{font-size:15px;font-weight:600}
+/* request button skin */
+.skinbtn{position:relative;overflow:hidden;width:100%;min-height:60px;padding:0;border:2px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;border-radius:12px;cursor:pointer;font:inherit}
+.skinbtn .swatch{position:absolute;inset:0;width:100%;height:100%;border-radius:0}
+.skinlbl{position:relative;background:rgba(6,12,24,.88);color:#fff;padding:8px 16px;border-radius:10px;font-weight:700;font-size:16px}
+.skinbtn:hover{border-color:#fff}
+.delaynote{font-size:13px;color:var(--muted);margin:8px 0 0}
+.statepill{width:100%;font:inherit;font-weight:600;display:flex;align-items:center;justify-content:center;min-height:60px;border:1px dashed rgba(255,255,255,.25);border-radius:12px;color:var(--muted);background:transparent;cursor:not-allowed;user-select:none}
+/* teacher */
+.tgrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;align-items:start}
+.srow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.sint{color:var(--muted);font-size:14px}
+.tbadge{margin-left:auto;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--err);background:rgba(255,122,122,.12);color:var(--text);font-weight:700;cursor:pointer;white-space:nowrap}
+.tbadge .adot{width:10px;height:10px;border-radius:50%;background:var(--err);box-shadow:0 0 0 3px rgba(255,122,122,.25)}
+.forcebtn{margin-left:auto;min-height:44px;padding:0 16px;border-radius:12px;border:2px solid var(--force);background:transparent;color:var(--force);font-weight:700;cursor:pointer;white-space:nowrap}
+.forcebtn:hover{background:rgba(240,163,94,.1)}
+.shint{margin-left:auto;font-size:13px;color:var(--muted);border:1px dashed var(--line);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.toast{font-size:14px;color:var(--muted);margin-top:10px;min-height:20px}
+.tl{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.tl li{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+.tl .approved{border-left:3px solid var(--accent)}
+.tl .forced{border-left:3px solid var(--force)}
+.tl .kind{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tl .approved .kind{color:var(--accent)}
+.tl .forced .kind{color:var(--force)}
+.empty{color:var(--muted);font-size:14px;margin-top:8px}
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(3,6,14,.72);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10}
+.scrim[hidden]{display:none}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:22px;width:min(460px,100%)}
+.mhead{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.mhead h2{flex:1;margin:0;font-size:19px}
+.mx{min-height:40px;min-width:72px}
+.mfacts{display:grid;gap:8px;margin:12px 0 16px;font-size:15px}
+.mfacts .row{display:flex;gap:10px;align-items:center}
+.mfacts .k{color:var(--muted);width:150px;flex:none}
+.mnote{color:var(--muted);font-size:12px;margin-top:12px}
+.mact{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn.approve{color:var(--accent);border:2px solid var(--accent);background:rgba(88,182,250,.06)}
+.btn.deny{color:var(--err);border:2px solid var(--err);background:rgba(255,122,122,.06)}
+.btn.confirm{color:var(--force);border:2px solid var(--force);background:rgba(240,163,94,.08)}
+/* pick */
+.picks{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.pickbtn{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;font-weight:600}
+.pickbtn:hover{border-color:var(--accent)}
+.pickstage{padding:22px}
+
+/* round 2: top five */
+.skinbtn:disabled{opacity:.45;cursor:not-allowed}
+.skinbtn:disabled:hover{border-color:rgba(255,255,255,.35)}
+.five-sub{font-size:13px;color:var(--muted);margin-bottom:10px}
+.list{display:grid;gap:8px}
+.lrow{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.02);text-align:left;font-weight:600;cursor:default;white-space:nowrap}
+button.lrow{cursor:pointer}
+button.lrow:hover{border-color:var(--accent)}
+button.lrow[aria-checked="true"]{border-color:var(--accent);background:rgba(88,182,250,.1)}
+.lrow .dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--muted);flex:none}
+.lrow.cur .dot{background:var(--accent);border-color:var(--accent)}
+button.lrow[aria-checked="true"] .dot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px rgba(88,182,250,.25)}
+.lrow.dis{color:var(--muted)}
+.rtag{margin-left:auto;font-size:12px;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.lrow.cur .rtag{color:var(--accent);border-color:rgba(88,182,250,.5)}
+.lrow:focus-visible,.skinbtn:focus-visible,.statepill:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.actionrow{margin-top:12px}
+.cgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.cgrid .skinbtn{width:100%}
+.flatchip{display:flex;align-items:center;gap:10px;min-height:60px;padding:0 16px;border:1px dashed rgba(255,255,255,.22);border-radius:12px;color:var(--muted);font-weight:600;white-space:nowrap}
+.flatchip.cur{border:2px solid rgba(88,182,250,.55);color:var(--text);background:rgba(88,182,250,.08)}
+.flatchip .rtag{margin-left:auto}
+.stack{display:grid;gap:16px}
+.askrow{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.askbtn{min-width:200px;min-height:52px;font-size:16px}
+.askwhy{font-size:14px;color:var(--muted)}
+.five{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;padding:0;list-style:none}
+.five li{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:600;font-size:14px;color:var(--muted);white-space:nowrap}
+.five li.cur{color:var(--text);border-color:rgba(88,182,250,.55)}
+.picker{margin-top:14px;border:1px solid rgba(88,182,250,.45);border-radius:16px;padding:14px;background:rgba(88,182,250,.04)}
+.picker h3{font-size:15px;margin:0 0 10px}
+.prow2{display:grid;grid-template-columns:1fr auto;gap:12px;margin-top:12px;align-items:center}
+.bar{height:8px;border-radius:999px;background:rgba(255,255,255,.08);margin:8px 0 6px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.note[tabindex="-1"]:focus{outline:none}
+.hgate{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr);gap:24px;align-items:center;padding:14px 18px}
+.hgate h2{margin-bottom:2px}
+.hgate .bar{margin:6px 0 0}
+.stack .note{margin:0}
+.cgrid .skinlbl{font-size:14px;padding:7px 10px}
+
+</style>
+</head>
+<body class="variant-v4">
+<div class="proto" role="region" aria-label="Proto controls (prototype only, not app UI)">
+  <div class="wrap proto-in">
+    <span class="proto-label">Proto controls · prototype only</span>
+    <div class="seg" role="group" aria-label="Prototype view switch">
+      <button type="button" class="pbtn" id="viewStudent" data-act="view" data-view="student">Student view</button>
+      <button type="button" class="pbtn" id="viewTeacher" data-act="view" data-view="teacher">Teacher view</button>
+    </div>
+    <button type="button" class="pbtn" id="credBelow" data-act="below">Set credits below target (fixture)</button>
+    <button type="button" class="pbtn" id="credAbove" data-act="above">Set credits at target (fixture)</button>
+    <button type="button" class="pbtn" id="delayBtn" data-act="delay" title="Stand-in for the later boundary (OQ-6). Does not apply a change immediately.">Trigger delayed boundary (stand-in)</button>
+    <button type="button" class="pbtn" id="resetBtn" data-act="reset">Reset demo</button>
+    <span id="protoMsg" class="proto-msg" role="status" aria-live="polite"></span>
+  </div>
+</div>
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">WVR-252 · v4 · List-first</p>
+    <h1 id="viewTitle">Student view</h1>
+  </header>
+  <div class="banner" id="banner">
+    <p class="banner-text" id="bannerText"><span class="b1">Proposed defaults, not decided: see Open questions in stories.md.</span><span class="b2"> This file is a prototype, not the app.</span></p>
+    <button type="button" class="banner-tog" id="bannerTog" data-act="banner" aria-expanded="true" aria-controls="bannerText">Collapse</button>
+  </div>
+  <p class="tests">Tests: a plain list of the top five with the current one marked and a credit reason, no map. Is the top-five set and the credit limit obvious without extra chrome? The request button for the chosen interest uses that interest's skin.</p>
+  <main>
+    <section id="student" aria-label="Student view"></section>
+    <section id="teacher" aria-label="Teacher view" hidden></section>
+  </main>
+  <footer class="foot">Prototype: saved on this device only.</footer>
+</div>
+<div id="scrim" class="scrim" hidden>
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div>
+</div>
+<script>
+(function(){
+'use strict';
+var V = 'v4';
+var KEY = 'wvr252:' + V + ':state';
+var TARGET = 10; // fixture amount, not a product rule (OQ-1)
+var SEED_CREDITS = 4;
+var LABEL = {space:'Space', ocean:'Ocean', plants:'Plants', ballet:'Ballet', past:'Digging up the past'};
+var TOP = ['space','ocean','plants','ballet','past']; // fixture top five (OQ-7)
+function seed(){ return {interest:'space', credits:SEED_CREDITS, request:null, force:null, last:null, view:'student', timeline:[]}; }
+function load(){
+  try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && LABEL[s.interest] && typeof s.credits === 'number') return s; } catch(e) {}
+  return seed();
+}
+var S = load();
+var ui = {toast:'', modal:null, sel:null, picker:false};
+function save(){ localStorage.setItem(KEY, JSON.stringify(S)); }
+function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function $(id){ return document.getElementById(id); }
+function protoMsg(t){ $('protoMsg').textContent = t || ''; }
+function ready(){ return S.credits >= TARGET; }
+function mode(){
+  if (S.force && S.force.status === 'picking') return 'picking';
+  if (S.force && S.force.status) return 'coming';
+  if (S.request) return S.request.status; // pending | scheduled
+  return ready() ? 'ready' : 'locked';
+}
+function selectable(m){ return m === 'ready' || m === 'picking'; }
+function others(){ return TOP.filter(function(k){ return k !== S.interest; }); }
+
+function skinDefs(skin, idp){
+  var stops = {ocean:['#0e4d6b','#06283d'], space:['#1b1640','#0a0c1f'], ballet:['#4a2040','#1a0c18'], plants:['#163820','#0a1a10'], past:['#3a2a18','#1a140c']}[skin] || ['#1b1640','#0a0c1f'];
+  return '<linearGradient id="'+idp+'g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+stops[0]+'"/><stop offset="1" stop-color="'+stops[1]+'"/></linearGradient>';
+}
+function skinDecor(skin){
+  if (skin === 'ocean') return '<path d="M0 60 q15 -8 30 0 t30 0 t30 0 t30 0 t30 0 t30 0" stroke="#5fd3e6" stroke-opacity=".35" fill="none" stroke-width="3"/><path d="M0 110 q15 -8 30 0 t30 0 t30 0 t30 0 t30 0 t30 0" stroke="#5fd3e6" stroke-opacity=".25" fill="none" stroke-width="3"/>';
+  if (skin === 'plants') return '<circle cx="40" cy="70" r="18" fill="#2f7a45" fill-opacity=".45"/><circle cx="130" cy="40" r="14" fill="#3d8f52" fill-opacity=".4"/>';
+  if (skin === 'ballet') return '<circle cx="90" cy="50" r="20" fill="#e8a0c8" fill-opacity=".25"/>';
+  if (skin === 'past') return '<rect x="20" y="80" width="40" height="16" rx="2" fill="#c4a574" fill-opacity=".35"/>';
+  return '<circle cx="20" cy="24" r="1.6" fill="#fff"/><circle cx="150" cy="18" r="1.4" fill="#fff"/><circle cx="160" cy="80" r="1.2" fill="#fff"/><circle cx="30" cy="120" r="1.3" fill="#fff"/><circle cx="148" cy="44" r="14" fill="#7b5cff" fill-opacity=".45"/>';
+}
+function scene(skin, idp){
+  return '<svg class="swatch" viewBox="0 0 180 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>'+skinDefs(skin,idp)+'</defs><rect width="180" height="120" fill="url(#'+idp+'g)"/>'+skinDecor(skin)+'</svg>';
+}
+function skinBtn(id, act, to, label, extra){
+  return '<button type="button" class="skinbtn'+(extra||'')+'" id="'+id+'" data-act="'+act+'" data-to="'+to+'" data-skin="'+to+'">'+scene(to,'s'+id)+'<span class="skinlbl">'+esc(label)+'</span></button>';
+}
+function pill(text){ return '<button type="button" class="statepill" id="stateBtn" disabled>'+esc(text)+'</button>'; }
+
+function rowTag(k, m){
+  if (m === 'locked') return 'Locked · credits';
+  if (m === 'pending' && S.request.to === k) return 'Requested';
+  if (m === 'scheduled' && S.request.to === k) return 'Approved · starts later';
+  return '';
+}
+function rowHtml(k, m){
+  var cur = k === S.interest, tag = cur ? 'Current' : rowTag(k, m);
+  var t = tag ? '<span class="rtag">'+esc(tag)+'</span>' : '';
+  if (cur) return '<div class="lrow cur" data-row="'+k+'"><span class="dot"></span>'+esc(LABEL[k])+t+'</div>';
+  if (selectable(m)) return '<button type="button" role="radio" class="lrow" id="row-'+k+'" data-act="sel" data-to="'+k+'" aria-checked="'+(ui.sel === k)+'"><span class="dot"></span>'+esc(LABEL[k])+t+'</button>';
+  return '<div class="lrow dis" data-row="'+k+'"><span class="dot"></span>'+esc(LABEL[k])+t+'</div>';
+}
+function listHtml(m){
+  var h = '<div class="list" id="topFive" role="'+(selectable(m)?'radiogroup':'list')+'" aria-label="Your top five interests">';
+  TOP.forEach(function(k){ h += rowHtml(k, m); });
+  return h + '</div>';
+}
+function statusLabel(m){
+  if (m === 'locked') return 'Locked · reach the credit target (fixture)';
+  if (m === 'pending') return 'Request sent · waiting for your teacher';
+  if (m === 'scheduled') return 'Approved · not applied yet';
+  if (m === 'coming') return 'A change is coming · you pick later';
+  return '';
+}
+function submitArea(m){
+  if (m === 'ready' || m === 'picking') {
+    var act = m === 'picking' ? 'pick' : 'submit', pre = m === 'picking' ? 'Choose ' : 'Ask to switch to ';
+    if (ui.sel && ui.sel !== S.interest) return skinBtn('submitReq', act, ui.sel, pre + LABEL[ui.sel]);
+    return pill('Pick an interest above');
+  }
+  return pill(statusLabel(m));
+}
+function pickFixture(){
+  return '<p class="fix" id="pickFixture">Fixture: this choice set follows the request set (the other interests in your top five). Stay is not offered in this prototype. Not a product rule (OQ-4).</p>';
+}
+
+// v4 list-first
+function panelList(m){
+  var h = '<section class="panel" id="decision" aria-labelledby="fiveH"><h2 id="fiveH">'+(m==='picking'?'Pick your next interest':'Your top five')+'</h2>';
+  h += '<p class="five-sub">Fixture set. How the top five are chosen is not decided (OQ-7).</p>' + listHtml(m);
+  h += '<div class="actionrow">'+submitArea(m)+'</div>';
+  if (m === 'picking') h += pickFixture();
+  return h + '</section>';
+}
+// v5 skin chips
+function panelChips(m){
+  var h = '<section class="panel" id="decision" aria-labelledby="fiveH"><h2 id="fiveH">'+(m==='picking'?'Pick your next interest':'Your top five')+'</h2>';
+  h += '<p class="five-sub">'+(selectable(m)?(m==='picking'?'Choose one of the other four.':'Ask to switch to any of the other four.'):'Fixture set. How the top five are chosen is not decided (OQ-7).')+'</p><div class="cgrid" id="topFive">';
+  TOP.forEach(function(k){
+    var cur = k === S.interest;
+    if (cur) { h += '<div class="flatchip cur" data-row="'+k+'"><span>'+esc(LABEL[k])+'</span><span class="rtag">Current</span></div>'; return; }
+    if (m === 'ready') h += skinBtn('chip-'+k, 'submit', k, 'Ask to switch to '+LABEL[k], ' chip go');
+    else if (m === 'picking') h += skinBtn('chip-'+k, 'pick', k, 'Choose '+LABEL[k], ' chip go');
+    else if (m === 'locked') h += '<button type="button" class="skinbtn chip" id="chip-'+k+'" data-skin="'+k+'" disabled>'+scene(k,'sc'+k)+'<span class="skinlbl">'+esc(LABEL[k])+' · locked (credits)</span></button>';
+    else { var tg = rowTag(k, m); h += '<div class="flatchip" data-row="'+k+'"><span>'+esc(LABEL[k])+'</span>'+(tg?'<span class="rtag">'+esc(tg)+'</span>':'')+'</div>'; }
+  });
+  h += '</div>';
+  if (m === 'picking') h += pickFixture();
+  return h + '</section>';
+}
+// v6 one picker
+function pickerHtml(m){
+  var picking = m === 'picking';
+  var h = '<div class="picker" id="picker"><h3 id="pickH" tabindex="-1">'+(picking?'Pick your next interest':'Ask to switch: choose one of the other four')+'</h3>' + listHtml(m);
+  h += '<div class="prow2"><div>'+submitArea(m)+'</div>';
+  h += picking ? '<span></span>' : '<button type="button" class="btn ghost" id="pickCancel" data-act="askCancel">Cancel</button>';
+  h += '</div>';
+  if (picking) h += pickFixture();
+  return h + '</div>';
+}
+function panelPicker(m){
+  var h = '<section class="panel" id="decision" aria-label="Your top five">'+(m==='picking'?'':'<h2 id="fiveH">Your top five</h2>');
+  if (m !== 'picking') {
+    h += '<ul class="five" id="topFive" aria-label="Your top five interests">';
+    TOP.forEach(function(k){
+      var cur = k === S.interest, tg = cur ? ' · Current' : (rowTag(k, m) ? ' · ' + rowTag(k, m) : '');
+      h += '<li'+(cur?' class="cur"':'')+' data-row="'+k+'">'+esc(LABEL[k])+tg+'</li>';
+    });
+    h += '</ul>';
+  }
+  if (m === 'ready') {
+    h += '<div class="askrow"><button type="button" class="btn primary askbtn" id="askBtn" data-act="askOpen" aria-expanded="'+ui.picker+'">Ask to switch</button><span class="askwhy" id="askWhy">Credit target reached (fixture). Pick any of your other four.</span></div>';
+    if (ui.picker) h += pickerHtml(m);
+  } else if (m === 'locked') {
+    h += '<div class="askrow"><button type="button" class="btn primary askbtn" id="askBtn" disabled>Ask to switch</button><span class="askwhy" id="askWhy">Locked until you reach the credit target ('+S.credits+' of '+TARGET+', fixture).</span></div>';
+  } else if (m === 'picking') {
+    h += pickerHtml(m);
+  } else {
+    h += '<div class="askrow">'+pill(statusLabel(m))+'</div>';
+  }
+  return h + '</section>';
+}
+
+function gatePanel(m){
+  var pct = Math.min(100, Math.round(S.credits / TARGET * 100));
+  var why;
+  if (m === 'locked') why = 'Switching is locked until you reach the credit target. This is a credit limit only.';
+  else if (m === 'ready') why = 'You reached the credit target (fixture). You can ask to switch to any of your other top five. Your teacher decides, and a yes does not apply right away (stand-in wording).';
+  else if (m === 'picking') why = 'This change was started by your teacher, so it does not use your credits.';
+  else why = 'New requests wait while a change is in progress.';
+  var meter = '<p class="meter" id="credLine">'+S.credits+' of '+TARGET+' credits</p><div class="bar" aria-hidden="true"><i style="width:'+pct+'%"></i></div>';
+  var fix = '<p class="fix" id="credFixture">Fixture amount, not a product rule (OQ-1).</p>';
+  var rsn = '<p id="gateReason" style="margin-top:10px">'+esc(why)+'</p>';
+  if (V === 'v5') return '<section class="panel hgate" id="gatePanel" aria-labelledby="gateH"><div><h2 id="gateH">Credit limit</h2>'+meter+'</div><div>'+fix.replace('<p class="fix"','<p class="fix" style="margin-top:0"')+rsn.replace(' style="margin-top:10px"',' style="margin-top:8px"')+'</div></section>';
+  return '<section class="panel" id="gatePanel" aria-labelledby="gateH"><h2 id="gateH">Credit limit</h2>'+meter+fix+rsn+'</section>';
+}
+function noteHtml(m){
+  var cur = LABEL[S.interest], r = S.request, h = '';
+  if (m === 'pending') h = '<div class="note wait" id="reqStatus" tabindex="-1" role="status"><strong>Request sent: '+esc(LABEL[r.to])+'.</strong> Waiting for your teacher. You are still on '+esc(cur)+'.</div>';
+  else if (m === 'scheduled') h = '<div class="note sched" id="reqStatus" tabindex="-1" role="status"><strong>Your teacher said yes to '+esc(LABEL[r.to])+'.</strong> It does not apply yet. You are still on '+esc(cur)+'.</div>';
+  else if (m === 'coming') h = '<div class="note force" id="forceNote" tabindex="-1" role="status"><strong>A change is coming.</strong> You will pick your new interest later. You are still on '+esc(cur)+'.</div>';
+  else if (m === 'picking') h = '<div class="note force" id="pickNote" role="status"><strong>Your change is ready.</strong> You are still on '+esc(cur)+' (current). Pick your new interest. Your teacher did not pick it for you.</div>';
+  else if (S.last === 'denied') h = '<div class="note deny" id="denyNote" role="status">Your teacher said not now. You are still on '+esc(cur)+'. You can ask again.</div>';
+  else if (S.last === 'applied' || S.last === 'forced-applied') {
+    h = '<div class="note done" id="appliedNote" role="status">You are now on <strong>'+esc(cur)+'</strong>. <span class="muted" id="carryLabel">Fixture: credits carried over after the switch. Not a product rule (OQ-9).</span></div>';
+  }
+  return h;
+}
+
+function student(){
+  var m = mode(), cur = LABEL[S.interest];
+  var h = '<div class="idrow"><span class="name">Student A</span><span class="tag">Prototype pseudonym</span>';
+  h += '<span class="today" id="today">Today\'s work: '+esc(cur)+' (fixture tone)</span></div>';
+  var main = V === 'v4' ? panelList(m) : V === 'v5' ? panelChips(m) : panelPicker(m);
+  if (V === 'v5') h += '<div class="stack">' + gatePanel(m).replace('<section class="panel"','<section class="panel"') + noteHtml(m) + main + '</div>';
+  else h += '<div class="grid2">' + main + '<div class="col">' + gatePanel(m) + noteHtml(m) + '</div></div>';
+  return h;
+}
+
+function teacher(){
+  var r = S.request, cur = LABEL[S.interest], h = '';
+  h += '<div class="idrow"><span class="name">Teacher</span><span class="muted">Class</span></div>';
+  h += '<div class="tgrid"><section class="panel" aria-labelledby="rosH"><h2 id="rosH">Class</h2><p class="muted">Simplified stand-in for the class view. Not the 3D room or the calendar.</p><div class="srow" id="rowA" style="margin-top:12px"><span class="name" style="font-size:16px">Student A</span><span class="tag">Prototype pseudonym</span><span class="sint">Interest: <span id="tInterest">'+esc(cur)+'</span></span>';
+  if (r && r.status === 'pending') h += '<button type="button" class="tbadge" id="teacherBadge" data-act="openApprove" aria-haspopup="dialog" aria-label="Student A has a switch request. Open."><span class="adot"></span>Switch request</button>';
+  else if (r && r.status === 'scheduled') h += '<span class="shint" id="schedHint">Scheduled: '+esc(LABEL[r.to])+' later · still on '+esc(cur)+'</span>';
+  else if (S.force && S.force.status) h += '<span class="shint" id="forceHint">Forced switch scheduled · Student A will pick later</span>';
+  else h += '<button type="button" class="forcebtn" id="forceBtn" data-act="openForce">Force switch</button>';
+  h += '</div><p class="toast" id="tToast" role="status" tabindex="-1">'+esc(ui.toast)+'</p></section>';
+  h += '<section class="panel" id="timelinePanel" aria-labelledby="tlH"><h2 id="tlH">Timeline</h2><p class="muted">Approved and forced switches. Fixture log, this device only.</p>';
+  if (!S.timeline.length) h += '<p class="empty" id="tlEmpty">No entries yet.</p>';
+  else {
+    h += '<ol class="tl" id="timeline">';
+    S.timeline.forEach(function(e, i){
+      h += '<li class="'+e.kind+'" data-tl="'+i+'"><span class="kind">'+esc(e.kind === 'approved' ? 'Approved switch' : 'Forced switch')+'</span><p>'+esc(e.text)+'</p></li>';
+    });
+    h += '</ol>';
+  }
+  return h + '</section></div>';
+}
+
+function modal(){
+  var h = '<div class="mhead"><h2 id="mTitle"></h2><button type="button" class="btn ghost mx" id="mClose" data-act="close">Close</button></div>';
+  if (ui.modal === 'approve' && S.request && S.request.status === 'pending') {
+    h = h.replace('></h2>', '>Switch request</h2>');
+    h += '<p><span class="name" style="font-size:16px">Student A</span> <span class="tag">Prototype pseudonym</span></p>';
+    h += '<div class="mfacts"><div class="row"><span class="k">Current interest</span><strong id="mCur">'+esc(LABEL[S.interest])+'</strong></div><div class="row"><span class="k">Requested interest</span><strong id="mReq">'+esc(LABEL[S.request.to])+'</strong></div></div>';
+    h += '<div class="mact"><button type="button" class="btn deny" id="mDeny" data-act="deny">✕ Deny</button><button type="button" class="btn approve" id="mApprove" data-act="approve">✓ Approve</button></div>';
+    h += '<p class="mnote">One tap. No reason field in this prototype only (OQ-3). Approve schedules the change for later; it does not apply now.</p>';
+  } else if (ui.modal === 'force') {
+    h = h.replace('></h2>', '>Force a switch</h2>');
+    h += '<p><span class="name" style="font-size:16px">Student A</span> <span class="tag">Prototype pseudonym</span> is on <strong>'+esc(LABEL[S.interest])+'</strong>.</p>';
+    h += '<p style="margin:12px 0">You do not choose the destination. Student A will pick the new interest later.</p>';
+    h += '<div class="mact"><button type="button" class="btn ghost" id="mCancel" data-act="close">Cancel</button><button type="button" class="btn confirm" id="mConfirmForce" data-act="confirmForce">Confirm force</button></div>';
+    h += '<p class="mnote">Short confirm only. No reason field in this prototype only (OQ-3). The change does not apply now.</p>';
+  }
+  return h;
+}
+
+var lastFocus = null;
+function render(){
+  var st = S.view === 'student', m = mode();
+  if (!selectable(m)) { ui.sel = null; }
+  if (m !== 'ready') ui.picker = false;
+  if (ui.sel && (ui.sel === S.interest || !LABEL[ui.sel])) ui.sel = null;
+  $('student').hidden = !st; $('teacher').hidden = st;
+  $('student').innerHTML = st ? student() : '';
+  $('teacher').innerHTML = st ? '' : teacher();
+  $('viewTitle').textContent = st ? 'Student view' : 'Teacher view';
+  $('viewStudent').setAttribute('aria-pressed', st); $('viewTeacher').setAttribute('aria-pressed', !st);
+  var open = !st && (ui.modal === 'approve' && S.request && S.request.status === 'pending' || ui.modal === 'force');
+  if (!open) ui.modal = null;
+  $('scrim').hidden = !open;
+  $('modal').innerHTML = open ? modal() : '';
+}
+function focusId(id){ var e = $(id); if (e) e.focus({preventScroll:true}); }
+function clearPick(){ ui.sel = null; ui.picker = false; }
+
+function act(a, el){
+  if (a === 'view') { S.view = el.getAttribute('data-view'); ui.modal = null; ui.toast = ''; clearPick(); save(); render(); protoMsg(''); return; }
+  if (a === 'banner') { var b = $('banner'), c = b.classList.toggle('collapsed'); el.setAttribute('aria-expanded', !c); el.textContent = c ? 'Expand' : 'Collapse'; return; }
+  if (a === 'reset') { localStorage.removeItem(KEY); S = seed(); ui = {toast:'', modal:null, sel:null, picker:false}; save(); render(); protoMsg('Demo reset to seeded state.'); return; }
+  if (a === 'below') { S.credits = SEED_CREDITS; clearPick(); save(); render(); protoMsg('Credits set below the fixture target ('+SEED_CREDITS+' of '+TARGET+').'); return; }
+  if (a === 'above') { S.credits = TARGET; save(); render(); protoMsg('Credits set at the fixture target ('+TARGET+' of '+TARGET+').'); return; }
+  if (a === 'delay') {
+    clearPick();
+    if (S.request && S.request.status === 'scheduled') {
+      var to = S.request.to; S.interest = to; S.request = null; S.last = 'applied'; ui.toast = ''; save(); render();
+      protoMsg('Delayed boundary ran: Student A is now on ' + LABEL[to] + '. Credits carried over (fixture).');
+    } else if (S.force && S.force.status === 'scheduled') {
+      S.force.status = 'picking'; S.view = 'student'; save(); render();
+      protoMsg('Delayed boundary ran: Student A is still on ' + LABEL[S.interest] + ' and must pick.');
+    } else if (S.force && S.force.status === 'picking') {
+      render(); protoMsg('Student A is already at the pick step. No change until they choose.');
+    } else { render(); protoMsg('Nothing scheduled. No change.'); }
+    return;
+  }
+  if (a === 'sel') {
+    var k = el.getAttribute('data-to'), m = mode();
+    if (!selectable(m) || !LABEL[k] || k === S.interest) return;
+    ui.sel = k; render(); focusId('row-' + k); return;
+  }
+  if (a === 'askOpen') { if (mode() !== 'ready') return; ui.picker = true; ui.sel = null; render(); focusId('pickH'); return; }
+  if (a === 'askCancel') { clearPick(); render(); focusId('askBtn'); return; }
+  if (a === 'submit') {
+    var d = el.getAttribute('data-to');
+    if (mode() !== 'ready' || !LABEL[d] || d === S.interest) return;
+    S.request = {status:'pending', to:d}; S.last = null; clearPick(); save(); render(); focusId('reqStatus'); return;
+  }
+  if (a === 'openApprove') { if (!S.request || S.request.status !== 'pending') return; lastFocus = 'teacherBadge'; ui.modal = 'approve'; render(); focusId('mClose'); return; }
+  if (a === 'openForce') { lastFocus = 'forceBtn'; ui.modal = 'force'; render(); focusId('mClose'); return; }
+  if (a === 'close') { closeModal(); return; }
+  if (a === 'approve' || a === 'deny') {
+    if (!S.request || S.request.status !== 'pending') return;
+    var to2 = LABEL[S.request.to];
+    if (a === 'approve') {
+      S.timeline.push({kind:'approved', text:'Student A · approved switch to '+to2+' (student requested it).', dest:S.request.to});
+      S.request.status = 'scheduled'; S.last = null;
+      ui.toast = 'Approved: ' + to2 + ' is scheduled for later. Student A stays on ' + LABEL[S.interest] + ' for now.';
+    } else {
+      // OQ-10 fixture: do not log a deny
+      S.request = null; S.last = 'denied';
+      ui.toast = 'Denied. Student A stays on ' + LABEL[S.interest] + ' and can ask again.';
+    }
+    ui.modal = null; save(); render(); focusId('tToast'); return;
+  }
+  if (a === 'confirmForce') {
+    S.force = {status:'scheduled'}; S.last = null;
+    S.timeline.push({kind:'forced', text:'Student A · forced switch started. Student A will pick the new interest later.', dest:null});
+    ui.toast = 'Forced switch scheduled. Student A stays put and will pick later.';
+    ui.modal = null; save(); render(); focusId('tToast'); return;
+  }
+  if (a === 'pick') {
+    if (!S.force || S.force.status !== 'picking') return;
+    var chosen = el.getAttribute('data-to');
+    if (!chosen || chosen === S.interest || !LABEL[chosen]) return;
+    S.interest = chosen; S.force = null; S.last = 'forced-applied'; clearPick();
+    S.timeline.push({kind:'forced', text:'Student A · forced switch: student picked '+LABEL[chosen]+'.', dest:chosen});
+    save(); render(); protoMsg('Student A picked ' + LABEL[chosen] + '. Credits carried over (fixture).');
+    return;
+  }
+}
+function closeModal(){ ui.modal = null; render(); if (lastFocus) focusId(lastFocus); }
+document.addEventListener('click', function(e){
+  var el = e.target.closest('[data-act]');
+  if (el && !el.disabled) { act(el.getAttribute('data-act'), el); return; }
+  if (e.target === $('scrim')) closeModal();
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && ui.modal) { closeModal(); e.preventDefault(); }
+  if (e.key === 'Tab' && ui.modal) {
+    var f = $('modal').querySelectorAll('button'); if (!f.length) return;
+    var first = f[0], last = f[f.length-1];
+    if (e.shiftKey && document.activeElement === first) { last.focus(); e.preventDefault(); }
+    else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
+  }
+});
+save(); render();
+})();
+
+</script>
+</body>
+</html>
